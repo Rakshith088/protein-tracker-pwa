@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
+<title>Protein Tracker</title>
+<meta name="description" content="Protein-first daily macro tracker.">
+<meta name="theme-color" content="#f0f0ec" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#14130e" media="(prefers-color-scheme: dark)">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" href="./icons/favicon.png">
+<link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Protein">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<header class="appbar" id="appbar">
+  <div class="brand"><span class="dot" aria-hidden="true"></span>Protein</div>
+  <div class="mini" id="miniP" aria-hidden="true">0/160 g</div>
+  <div class="acts">
+    <span class="date" id="date"></span>
+    <button class="iconbtn" id="btnHist" aria-label="History" title="History">
+      <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
+    </button>
+    <button class="iconbtn" id="btnSet" aria-label="Settings" title="Settings">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main>
+  <section class="hero" id="hero" aria-label="Protein progress">
+    <div class="ringwrap">
+      <svg class="ring" viewBox="0 0 212 212" aria-hidden="true">
+        <circle class="track" cx="106" cy="106" r="88"></circle>
+        <circle class="prog" id="prog" cx="106" cy="106" r="88"></circle>
+      </svg>
+      <div class="center">
+        <div class="pnum" id="pnum">0</div>
+        <div class="ptarget" id="ptarget">/ 160 g</div>
+        <div class="plabel">Protein</div>
+      </div>
+    </div>
+    <div class="remain" id="remain">—</div>
+    <div class="badge" id="badge">✓ Target hit — nice work</div>
+  </section>
+
+  <div class="subs">
+    <div class="stat cal" id="calbox">
+      <div class="k">Calories</div>
+      <div><span class="v" id="cal">0</span> <span class="of" id="calof">/ 1975 kcal</span></div>
+      <div class="bar"><i id="calbar" style="width:0%"></i></div>
+    </div>
+    <div class="stat"><div class="k">Fat</div><div class="v" id="fat">0<span class="of">/58g</span></div></div>
+    <div class="stat"><div class="k">Carbs</div><div class="v" id="carb">0<span class="of">/200g</span></div></div>
+    <div class="stat"><div class="k">Items</div><div class="v" id="count">0</div></div>
+  </div>
+
+  <section class="rec" id="rec" aria-live="polite"></section>
+
+  <h2 class="h">Tap to log</h2>
+  <div class="legend">Tap a food → set the amount → add. <b>g P</b> = grams protein.</div>
+  <div class="favs" id="favs"></div>
+  <input class="search" id="search" type="search" placeholder="Search foods…" autocomplete="off" aria-label="Search foods">
+  <div id="foodlist"></div>
+
+  <details class="addfood">
+    <summary><span class="plus">+</span> Add a food to my list (saved permanently)</summary>
+    <div class="form">
+      <div class="hintline">Enter the macros exactly as printed on the label, and the amount they're for.</div>
+      <input class="full" id="cfName" placeholder="Food name" autocomplete="off">
+      <input id="cfAmt" inputmode="decimal" placeholder="Amount (e.g. 100)">
+      <input id="cfUnit" placeholder="Unit (g, ml, piece)" autocomplete="off">
+      <input id="cfP" inputmode="decimal" placeholder="Protein g">
+      <input id="cfK" inputmode="decimal" placeholder="Calories">
+      <input id="cfF" inputmode="decimal" placeholder="Fat g">
+      <input id="cfC" inputmode="decimal" placeholder="Carbs g">
+      <button id="cfAdd">Save to my foods</button>
+    </div>
+  </details>
+
+  <h2 class="h">Today's log</h2>
+  <div class="log" id="log"></div>
+
+  <section class="wt" aria-label="Weight log">
+    <div class="wthead">
+      <div class="t">Weight</div>
+      <div class="avg" id="wtAvg">—</div>
+    </div>
+    <div class="wtbody">
+      <input id="wtIn" inputmode="decimal" placeholder="Today's weight (kg)" aria-label="Weight in kg">
+      <button id="wtAdd">Log</button>
+    </div>
+    <div class="spark" id="wtSpark"></div>
+    <div class="wttrend" id="wtTrend">Weigh in most mornings — the 7-day average is what matters, not any single day.</div>
+  </section>
+
+  <section class="week" aria-label="Last 7 days">
+    <div class="weekhead">
+      <div class="t">Last 7 days</div>
+      <div class="s"><b id="hitCount">0</b>/7 days on target</div>
+    </div>
+    <div class="days" id="days"></div>
+  </section>
+
+  <div class="foot">
+    <span id="footTargets">Targets: 160 g protein · 1975 kcal · fat 58 g · carbs 200 g</span><br>
+    Resets each morning · saved on this device, works offline
+    <br><button class="clear" id="clear">Clear today</button>
+  </div>
+</main>
+
+<div class="toast" id="toast" role="status"></div>
+
+<!-- quantity sheet -->
+<div class="sheet-back" id="sheetBack"></div>
+<div class="sheet" id="sheet" role="dialog" aria-label="Set amount">
+  <div class="grab" aria-hidden="true"></div>
+  <div class="sheet-title" id="sTitle">Food</div>
+  <div class="sheet-hint" id="sHint"></div>
+  <div class="stepper">
+    <button id="sMinus" aria-label="Decrease amount">−</button>
+    <div class="amtbox"><input id="sAmt" inputmode="decimal" aria-label="Amount"><span class="u" id="sUnit">g</span></div>
+    <button id="sPlus" aria-label="Increase amount">+</button>
+  </div>
+  <div class="sheet-macros" id="sMacros"></div>
+  <div class="seg" id="sSeg" role="group" aria-label="Meal">
+    <button data-m="Breakfast">Breakfast</button>
+    <button data-m="Lunch">Lunch</button>
+    <button data-m="Snack">Snack</button>
+    <button data-m="Dinner">Dinner</button>
+  </div>
+  <div class="sheet-actions" style="margin-top:14px">
+    <button class="cancel" id="sCancel">Cancel</button>
+    <button class="addbtn" id="sAdd">Add to today</button>
+  </div>
+  <button class="delfood" id="delFood">Remove from my foods</button>
+</div>
+
+<!-- history sheet -->
+<div class="sheet-back" id="histBack"></div>
+<div class="sheet" id="histSheet" role="dialog" aria-label="History">
+  <div class="grab" aria-hidden="true"></div>
+  <div class="sheet-title">History</div>
+  <div class="histnav">
+    <button id="hPrev" aria-label="Previous day">‹</button>
+    <div class="hd"><div class="hdd" id="hDate">—</div><div class="hds" id="hTot">—</div></div>
+    <button id="hNext" aria-label="Next day">›</button>
+  </div>
+  <div class="hist" id="hBody"></div>
+  <div class="sheet-actions" style="margin-top:14px;grid-template-columns:1fr">
+    <button class="cancel" id="hClose">Close</button>
+  </div>
+</div>
+
+<!-- settings sheet -->
+<div class="sheet-back" id="setBack"></div>
+<div class="sheet" id="setSheet" role="dialog" aria-label="Settings">
+  <div class="grab" aria-hidden="true"></div>
+  <div class="sheet-title">Settings</div>
+  <div class="sheet-scroll">
+    <div class="sec-h">Daily targets</div>
+    <div class="setgrid">
+      <div class="setf"><label for="tP">Protein g</label><input id="tP" inputmode="decimal"></div>
+      <div class="setf"><label for="tK">Calories</label><input id="tK" inputmode="decimal"></div>
+      <div class="setf"><label for="tF">Fat g</label><input id="tF" inputmode="decimal"></div>
+      <div class="setf"><label for="tC">Carbs g</label><input id="tC" inputmode="decimal"></div>
+    </div>
+    <div class="setnote">Your plan: 160 g protein · 1975 kcal · 58 g fat · 200 g carbs — from 76 kg, TDEE ≈ 2475 kcal minus a 500 kcal deficit.</div>
+
+    <div class="sec-h">Your data</div>
+    <div class="setrow">
+      <button id="expJson">Export backup</button>
+      <button id="expCsv">Export CSV</button>
+    </div>
+    <div class="setrow">
+      <button id="impBtn">Import backup</button>
+    </div>
+    <input type="file" id="impFile" accept="application/json,.json" style="display:none">
+    <div class="setnote">Backup saves everything — logs, your foods, weights, targets. Keep one somewhere safe: clearing this site's browser data wipes the app.</div>
+
+    <div class="setnote" id="statLine" style="margin-top:14px"></div>
+  </div>
+  <div class="sheet-actions" style="margin-top:14px">
+    <button class="cancel" id="setCancel">Cancel</button>
+    <button class="addbtn" id="setSave">Save targets</button>
+  </div>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>

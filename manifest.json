@@ -1,0 +1,17 @@
+{
+  "name": "Protein Tracker",
+  "short_name": "Protein",
+  "description": "Protein-first daily macro tracker — 160 g protein, 1975 kcal.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f0f0ec",
+  "theme_color": "#2563e8",
+  "categories": ["health", "fitness", "lifestyle"],
+  "icons": [
+    { "src": "./icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "./icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
