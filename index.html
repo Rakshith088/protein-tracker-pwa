@@ -5,8 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
 <title>Protein Tracker</title>
 <meta name="description" content="Protein-first daily macro tracker.">
-<meta name="theme-color" content="#f0f0ec" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#14130e" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" id="themeColor" content="#f0f0ec">
 <link rel="manifest" href="./manifest.json">
 <link rel="icon" href="./icons/favicon.png">
 <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
@@ -22,6 +21,9 @@
   <div class="mini" id="miniP" aria-hidden="true">0/160 g</div>
   <div class="acts">
     <span class="date" id="date"></span>
+    <button class="iconbtn" id="btnTheme" aria-label="Switch appearance" title="Appearance">
+      <svg id="thIcon" viewBox="0 0 24 24"></svg>
+    </button>
     <button class="iconbtn" id="btnHist" aria-label="History" title="History">
       <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>
     </button>

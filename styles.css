@@ -35,8 +35,11 @@
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
   --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
 }
+/* Dark tokens live in one place, applied two ways:
+   · system dark, unless the user has explicitly chosen light
+   · explicit user choice of dark  */
 @media (prefers-color-scheme:dark){
-  :root{
+  :root:not([data-theme="light"]){
     --bg:#14130e;
     --surface:#1d1c15;
     --surface-2:#262419;
@@ -44,7 +47,6 @@
     --muted:#a3a193;        /* 7.2:1 on ink */
     --line:#2e2c22;
     --track:#2e2c22;
-
     --accent-text:#86abff;  /* 8.2:1 on ink */
     --accent-surface:#dcf65e;   /* lime — surface only */
     --accent-on:#14130e;        /* ink text on lime — always */
@@ -53,7 +55,21 @@
     --danger:#f0a58a;       /* 9.3:1 on ink */
   }
 }
-
+:root[data-theme="dark"]{
+    --bg:#14130e;
+    --surface:#1d1c15;
+    --surface-2:#262419;
+    --text:#fafaf8;
+    --muted:#a3a193;        /* 7.2:1 on ink */
+    --line:#2e2c22;
+    --track:#2e2c22;
+    --accent-text:#86abff;  /* 8.2:1 on ink */
+    --accent-surface:#dcf65e;   /* lime — surface only */
+    --accent-on:#14130e;        /* ink text on lime — always */
+    --accent-press:#c9e34b;
+    --graphic:#dcf65e;
+    --danger:#f0a58a;       /* 9.3:1 on ink */
+}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;overflow-x:hidden}          /* hard stop against sideways scroll */
 html{background:var(--bg)}

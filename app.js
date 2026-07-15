@@ -74,6 +74,10 @@
   const BASE_CATS=["My foods","Protein & dairy","Grains & carbs","Vegetables","Fruit","Nuts & fats"];
 
   const $=id=>document.getElementById(id);
+  /* Safe wiring: a missing element must never take down the rest of the app
+     (e.g. a stale index.html paired with a fresh app.js after a partial deploy). */
+  function bind(id,ev,fn){const el=$(id); if(el) el.addEventListener(ev,fn); return el;}
+  function warn(msg){ try{console.warn("[tracker] "+msg);}catch(e){} }
   const prog=$("prog"); prog.style.strokeDasharray=CIRC;
 
   let entries=[], customFoods=[], FOODS=[], targets={}, weights=[], taps={};
@@ -599,7 +603,7 @@
     const root=document.documentElement;
     if(mode==="auto") root.removeAttribute("data-theme");
     else root.setAttribute("data-theme",mode);
-    $("thIcon").innerHTML=THEME_ICONS[mode];
+    const ic=$("thIcon"); if(ic) ic.innerHTML=THEME_ICONS[mode];
     const effectiveDark = mode==="dark" || (mode==="auto" && systemDark());
     const mc=$("themeColor"); if(mc) mc.setAttribute("content", effectiveDark ? "#14130e" : "#f0f0ec");
   }
@@ -609,7 +613,7 @@
     const next=order[(order.indexOf(cur)+1)%order.length];
     lsSet("pt:theme",next);applyTheme(next);toast(THEME_LABEL[next]);
   }
-  $("btnTheme").onclick=cycleTheme;
+  bind("btnTheme","click",cycleTheme);
   if(window.matchMedia){
     const mq=window.matchMedia("(prefers-color-scheme:dark)");
     const onSys=()=>{ if(lsGet("pt:theme","auto")==="auto") applyTheme("auto"); };
@@ -617,15 +621,25 @@
   }
 
   /* ---------- init ---------- */
-  applyTheme(lsGet("pt:theme","auto"));
-  targets=Object.assign({},DEFAULT_TARGETS,lsGet("pt:targets",{}));
-  customFoods=lsGet("pt:customfoods",[]);
-  weights=lsGet("pt:weights",[]);
-  taps=lsGet("pt:taps",{});
-  entries=loadDay(dateKey);
-  rebuildFoods();
-  $("date").textContent=prettyDate();
-  renderChips("");renderFavs();render();renderWeight();renderWeek();
+  try{
+    applyTheme(lsGet("pt:theme","auto"));
+  }catch(e){ warn("theme init failed: "+e.message); }
+
+  try{
+    targets=Object.assign({},DEFAULT_TARGETS,lsGet("pt:targets",{}));
+    customFoods=lsGet("pt:customfoods",[]);
+    weights=lsGet("pt:weights",[]);
+    taps=lsGet("pt:taps",{});
+    entries=loadDay(dateKey);
+    rebuildFoods();
+    const dEl=$("date"); if(dEl) dEl.textContent=prettyDate();
+    renderChips("");renderFavs();render();renderWeight();renderWeek();
+  }catch(e){
+    warn("init failed: "+e.message);
+    const fl=$("foodlist");
+    if(fl) fl.innerHTML='<div class="empty">Something went wrong loading the app ('+e.message+
+      '). If you just updated it, fully close and reopen to clear the old cache.</div>';
+  }
 
   if("serviceWorker" in navigator){
     window.addEventListener("load",()=>navigator.serviceWorker.register("./sw.js").catch(()=>{}));

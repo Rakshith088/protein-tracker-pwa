@@ -73,7 +73,7 @@ Uses `localStorage` — **per-device, private, offline, permanent** until you cl
 - **Editable targets** — change protein / calories / fat / carbs from the settings sheet; everything (ring, recommender, week strip) re-derives
 - **Export / Import** — full JSON backup (logs, foods, weights, targets) and CSV export for spreadsheets
 - **Accordion food list** — categories collapse; only Protein & dairy opens by default. Cuts the page from ~5.1 screens to ~2.4 (54% less scrolling). Open/closed state is remembered; searching auto-expands matches.
-- **Dark mode** — follows system
+- **Appearance toggle** — the sun/moon/half-circle icon in the header cycles **Auto → Light → Dark**. Auto follows your phone (and updates live if the phone switches); Light and Dark override it and persist across sessions (`pt:theme`).
 - **Reduced motion / reduced transparency** — respected
 
 ---
