@@ -29,7 +29,7 @@
   --danger:#a8341c;         /* 6.3:1 on cream */
 
   --radius:18px; --tap:48px;
-  --z-sticky:20; --z-back:40; --z-sheet:50; --z-toast:60;
+  --z-sticky:20; --z-back:40; --z-sheet:50; --z-back-2:64; --z-sheet-2:66; --z-toast:80;
   --ease:cubic-bezier(.16,1,.3,1);
   --spring:cubic-bezier(.22,1,.36,1);
   --mono:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,monospace;
@@ -381,3 +381,113 @@ svg.ring{width:212px;height:212px;transform:rotate(-90deg)}
   .ringwrap,svg.ring{width:186px;height:186px}
   .seg button{font-size:10.5px}
 }
+
+/* A sheet opened from another sheet (picking a food while building a meal)
+   must stack above its parent, or the parent's buttons swallow the taps. */
+.sheet.stacked{z-index:var(--z-sheet-2)}
+.sheet-back.stacked{z-index:var(--z-back-2)}
+
+/* ============ v5: tabs · meals · plan ============ */
+body{padding-bottom:calc(88px + env(safe-area-inset-bottom))}   /* room for the tab bar */
+
+.view{display:none}
+.view.on{display:block;animation:viewIn .26s var(--ease)}
+@keyframes viewIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.view.on{animation:none}}
+
+/* bottom tab bar */
+.tabbar{
+  position:fixed;left:0;right:0;bottom:0;z-index:var(--z-sticky);
+  display:grid;grid-template-columns:repeat(3,1fr);gap:2px;
+  max-width:540px;margin:0 auto;
+  padding:6px 8px calc(6px + env(safe-area-inset-bottom));
+  background:color-mix(in srgb,var(--bg) 82%,transparent);
+  backdrop-filter:blur(20px) saturate(170%);-webkit-backdrop-filter:blur(20px) saturate(170%);
+  border-top:1px solid var(--line);
+}
+.tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  min-height:54px;border:none;background:none;color:var(--muted);cursor:pointer;border-radius:12px;
+  font-size:10.5px;font-weight:600;letter-spacing:.02em;transition:color .18s,background .18s,transform .09s var(--ease)}
+.tab svg{width:21px;height:21px;stroke:currentColor;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.tab:active{transform:scale(.93)}
+.tab.on{color:var(--accent-text)}
+.tab.on svg{stroke-width:2.1}
+
+/* fibre stat: quiet tick when the day's target is met */
+.stat#fibbox.met .v{color:var(--accent-text)}
+
+/* view headers */
+.viewhead{margin:16px 4px 14px}
+.viewhead h2{font-size:20px;font-weight:700;letter-spacing:-.02em}
+.viewhead p{margin:6px 0 0;font-size:13px;color:var(--muted);line-height:1.5}
+
+.bigbtn{width:100%;min-height:52px;border:1px dashed var(--line);background:var(--surface);color:var(--accent-text);
+  font-weight:700;font-size:14px;border-radius:14px;cursor:pointer;margin-top:10px;
+  transition:transform .09s var(--ease),border-color .15s}
+.bigbtn:active{transform:scale(.985);border-color:var(--accent-surface)}
+
+/* meal cards */
+.mealcard{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:13px 13px 11px;margin-bottom:9px}
+.mealcard .mh{display:flex;align-items:flex-start;gap:10px}
+.mealcard .mi{flex:1;min-width:0}
+.mealcard .mn{font-size:14.5px;font-weight:700;letter-spacing:-.01em}
+.mealcard .mslot{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-top:3px}
+.mealcard .mmac{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:6px;font-variant-numeric:tabular-nums}
+.mealcard .mmac b{color:var(--accent-text)}
+.mealcard .ming{font-size:11.5px;color:var(--muted);margin-top:6px;line-height:1.5;overflow-wrap:anywhere}
+.mealcard .mlog{flex:none;border:none;background:var(--accent-surface);color:var(--accent-on);font-weight:700;font-size:13px;
+  min-height:40px;padding:0 16px;border-radius:11px;cursor:pointer;transition:transform .09s var(--ease),background .15s}
+.mealcard .mlog:active{transform:scale(.94);background:var(--accent-press)}
+.mealcard .mfoot{display:flex;gap:14px;margin-top:10px;padding-top:9px;border-top:1px solid var(--line)}
+.mealcard .mfoot button{background:none;border:none;color:var(--muted);font-size:12px;text-decoration:underline;cursor:pointer;padding:4px 0}
+.mealcard .mfoot button:active{color:var(--accent-text)}
+
+/* meal builder */
+.mbrow{display:flex;align-items:center;gap:10px;background:var(--surface-2);border:1px solid var(--line);
+  border-radius:11px;padding:9px 8px 9px 12px;margin-bottom:6px;min-width:0}
+.mbrow .mbn{flex:1;min-width:0;font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mbrow .mba{font-family:var(--mono);font-size:11.5px;color:var(--muted);flex:none;font-variant-numeric:tabular-nums}
+.mbrow .mbx{width:32px;height:32px;flex:none;border:none;background:transparent;color:var(--muted);font-size:18px;
+  cursor:pointer;border-radius:8px}
+.mbrow .mbx:active{background:var(--track);color:var(--danger)}
+.mbtot{font-family:var(--mono);font-size:12.5px;color:var(--muted);text-align:center;padding:10px;
+  background:var(--surface-2);border-radius:11px;margin-top:4px;font-variant-numeric:tabular-nums}
+.mbtot b{color:var(--accent-text);font-size:14px}
+#mbPick{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:8px;max-height:210px;overflow-y:auto;
+  overscroll-behavior:contain;padding-right:2px}
+#mbPick .chip{padding:9px 10px}
+#mbPick .chip .nm{font-size:12px}
+
+/* ---------- plan document ---------- */
+.planhero{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:18px;margin-top:16px}
+.planhero h2{font-size:19px;font-weight:700;letter-spacing:-.02em;line-height:1.25}
+.planhero .pnote{font-size:12.5px;color:var(--muted);margin-top:8px;line-height:1.55}
+.plangrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px}
+.plangrid div{background:var(--surface-2);border-radius:11px;padding:10px 11px}
+.plangrid .pk{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.plangrid .pv{font-family:var(--mono);font-size:17px;font-weight:600;margin-top:2px;font-variant-numeric:tabular-nums}
+.plangrid .pv.hero{color:var(--accent-text)}
+
+.pdoc{margin-top:12px}
+.pdoc .acc>summary .ttl{font-size:13.5px}
+.pdoc .accbody{padding:2px 14px 14px}
+.pdoc h3{font-size:14px;font-weight:700;margin:16px 0 6px;letter-spacing:-.01em}
+.pdoc p{font-size:13.5px;line-height:1.6;margin:9px 0;color:var(--text)}
+.pdoc strong{font-weight:700}
+.pdoc em{font-style:italic;color:var(--muted)}
+.pdoc ul{margin:9px 0;padding-left:18px}
+.pdoc li{font-size:13.5px;line-height:1.6;margin:5px 0}
+.pdoc hr{border:none;border-top:1px solid var(--line);margin:16px 0}
+.pdoc blockquote{background:var(--surface-2);border-left:3px solid var(--accent-surface);border-radius:0 11px 11px 0;
+  padding:11px 13px;margin:10px 0;font-size:13px;line-height:1.6;color:var(--muted)}
+.pdoc blockquote strong{color:var(--text)}
+.pdoc code{font-family:var(--mono);font-size:12px;background:var(--surface-2);padding:1px 5px;border-radius:5px}
+.tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:10px -4px;padding:0 4px;
+  scrollbar-width:thin;overscroll-behavior-x:contain}
+.pdoc table{border-collapse:collapse;width:100%;min-width:440px;font-size:12.5px}
+.pdoc th,.pdoc td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.5}
+.pdoc th{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700;white-space:nowrap}
+.pdoc tbody tr:last-child td{border-bottom:none}
+.pdoc tbody tr:nth-child(odd) td{background:color-mix(in srgb,var(--surface-2) 55%,transparent)}
+.pdoc td strong{color:var(--text)}
+.scrollhint{font-size:10.5px;color:var(--muted);font-family:var(--mono);margin:-4px 0 8px;text-align:right}

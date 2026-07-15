@@ -2,7 +2,7 @@
 
 A protein-first daily macro tracker. Static, offline-capable, installable on your phone home screen. No build step, no backend, no accounts.
 
-**Targets baked in:** 160 g protein · 1975 kcal · 58 g fat · 200 g carbs
+**Targets baked in:** 160 g protein · 1975 kcal · 58 g fat · 200 g carbs · 30 g fibre
 (from 76 kg / 174 cm / 31 M, TDEE ≈ 2475 kcal − 500 deficit)
 
 ---
@@ -49,6 +49,9 @@ Uses `localStorage` — **per-device, private, offline, permanent** until you cl
 | `pt:log:YYYY-MM-DD` | that day's logged entries |
 | `pt:customfoods` | foods you added permanently |
 | `pt:targets` | your daily targets |
+| `pt:meals` | your saved meals |
+| `pt:theme` | auto / light / dark |
+| `pt:accordions` | which food sections you keep open |
 | `pt:weights` | weigh-in history |
 | `pt:taps` | tap counts (drives favourites) |
 
@@ -58,11 +61,18 @@ Uses `localStorage` — **per-device, private, offline, permanent** until you cl
 
 ---
 
+## Three tabs
+
+**Today** — the tracker. **Meals** — build and log your own meals. **Plan** — your full meal-plan document, embedded and offline.
+
 ## Features
 
 - **Hero ring** — protein toward your target; turns bright green when hit
 - **Close the gap** — recommends foods + exact amounts to hit remaining protein within remaining calories. Ranks by protein efficiency (kcal per gram of protein), only suggests foods that make a real dent, caps portions at 1.5× normal serving, one per category, and rotates daily so it doesn't repeat.
-- **51 foods** across My foods / Protein & dairy / Grains & carbs / Vegetables / Fruit / Nuts & fats
+- **51 foods** across My foods / Protein & dairy / Grains & carbs / Vegetables / Fruit / Nuts & fats — each with protein, fat, carbs, **fibre** and calories
+- **Fibre tracked** with a 30 g target (a plan-style day lands at ~31 g, so it's reachable without gaming it)
+- **My meals** — build a meal once from any foods + amounts (Breakfast 1, Breakfast 2, …), tag it to a slot, then log the whole thing with one tap. Edit or delete anytime; frequently-tapped meals surface in favourites.
+- **Plan tab** — your meal plan rendered natively in-app: an overview card of your targets, then every section as an accordion. Wide tables scroll sideways. Fully offline, no fetch.
 - **Quantity sheet** — tap food → stepper (− / +) or type exact amount → live macro preview → add. Drag the sheet handle down to dismiss (velocity-aware).
 - **My foods** — add any food permanently with label macros; marked with a jade dot; removable from its sheet
 - **7-day strip** — bar per day, green when ≥155 g
