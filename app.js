@@ -53,7 +53,9 @@
     {n:"Kosambari (moong salad)",cat:"Vegetables",unit:"katori",def:1,step:0.5,hint:"no-cook",per:{p:5,f:2,c:12,k:90,fib:4.0}},
     {n:"Green salad (dressed)",cat:"Vegetables",unit:"katori",def:1,step:0.5,per:{p:1,f:0.2,c:4,k:20,fib:1.5}},
     // Fruit
-    {n:"Banana",cat:"Fruit",unit:"piece",def:1,step:1,per:{p:1.3,f:0.3,c:27,k:105,fib:3.1}},
+    {n:"Banana – Robusta/Cavendish",cat:"Fruit",unit:"piece",def:1,step:1,hint:"~120g edible, the common everyday banana",per:{p:1.32,f:0.36,c:27.36,k:106.8,fib:3.12}},
+    {n:"Banana – Nendran",cat:"Fruit",unit:"piece",def:1,step:1,hint:"~160g edible, larger Kerala/coastal variety",per:{p:1.76,f:0.48,c:36.48,k:142.4,fib:4.16}},
+    {n:"Banana – Yelakki (Elaichi)",cat:"Fruit",unit:"piece",def:2,step:1,hint:"~40g edible each, small — figures below are for 2",per:{p:0.44,f:0.12,c:9.12,k:35.6,fib:1.04}},
     {n:"Apple",cat:"Fruit",unit:"piece",def:1,step:1,per:{p:0.5,f:0.3,c:25,k:95,fib:4.4}},
     {n:"Guava",cat:"Fruit",unit:"piece",def:1,step:1,per:{p:2.6,f:1,c:14,k:68,fib:5.4}},
     {n:"Papaya (cubes)",cat:"Fruit",unit:"katori",def:1,step:0.5,per:{p:0.7,f:0.4,c:15,k:60,fib:2.5}},
