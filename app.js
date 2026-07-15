@@ -587,7 +587,37 @@
   /* ---------- appbar ---------- */
   window.addEventListener("scroll",()=>{$("appbar").classList.toggle("scrolled",window.scrollY>8);},{passive:true});
 
+  /* ---------- appearance: auto / light / dark ---------- */
+  const THEME_ICONS={
+    auto:'<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor" stroke="none"/>',
+    light:'<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.1 5.1l1.4 1.4M17.5 17.5l1.4 1.4M18.9 5.1l-1.4 1.4M6.5 17.5l-1.4 1.4"/>',
+    dark:'<path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a6.8 6.8 0 0 0 10.5 10.5z"/>'
+  };
+  const THEME_LABEL={auto:"Following your phone",light:"Light mode",dark:"Dark mode"};
+  function systemDark(){return window.matchMedia&&window.matchMedia("(prefers-color-scheme:dark)").matches;}
+  function applyTheme(mode){
+    const root=document.documentElement;
+    if(mode==="auto") root.removeAttribute("data-theme");
+    else root.setAttribute("data-theme",mode);
+    $("thIcon").innerHTML=THEME_ICONS[mode];
+    const effectiveDark = mode==="dark" || (mode==="auto" && systemDark());
+    const mc=$("themeColor"); if(mc) mc.setAttribute("content", effectiveDark ? "#14130e" : "#f0f0ec");
+  }
+  function cycleTheme(){
+    const order=["auto","light","dark"];
+    const cur=lsGet("pt:theme","auto");
+    const next=order[(order.indexOf(cur)+1)%order.length];
+    lsSet("pt:theme",next);applyTheme(next);toast(THEME_LABEL[next]);
+  }
+  $("btnTheme").onclick=cycleTheme;
+  if(window.matchMedia){
+    const mq=window.matchMedia("(prefers-color-scheme:dark)");
+    const onSys=()=>{ if(lsGet("pt:theme","auto")==="auto") applyTheme("auto"); };
+    if(mq.addEventListener) mq.addEventListener("change",onSys); else if(mq.addListener) mq.addListener(onSys);
+  }
+
   /* ---------- init ---------- */
+  applyTheme(lsGet("pt:theme","auto"));
   targets=Object.assign({},DEFAULT_TARGETS,lsGet("pt:targets",{}));
   customFoods=lsGet("pt:customfoods",[]);
   weights=lsGet("pt:weights",[]);
