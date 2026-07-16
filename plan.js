@@ -1,10 +1,12 @@
 /* Protein Tracker — structured meal plan (v2)
-   Extracted from docs/MEAL_PLAN.md (plan last updated 2026-07-14).
+   Extracted from docs/MEAL_PLAN.md (plan last updated 2026-07-14; reconciled
+   2026-07-16: whey note, Breakfast B includes its ½ scoop, Dinner A counts a
+   separate tsp of oil for the eggs).
 
-   Ingredients link to food-DB entries by exact name; the app computes every
-   meal's macros live from the DB at render time. The `claimed` blocks are the
-   plan document's own stated numbers — kept only for the drift audit, never
-   rendered as truth.
+   Ingredients link to food-DB entries by exact name; `amt` is always grams
+   (or ml for liquids) — the app computes every meal's macros live from the
+   DB at render time. The `claimed` blocks are the plan document's stated
+   numbers — kept only for the drift audit, never rendered as truth.
 
    Items the DB can't log yet carry {name, est:{...}, unlinked:true} — their
    values are estimates pending Phase 2 sourcing.
@@ -12,9 +14,9 @@
    Nothing in this file may reference absolute daily targets (1,975 kcal etc.);
    targets live in pt:targets and are externally derived. */
 window.MEAL_PLAN = {
-  version: 1,
+  version: 2,
   source: "docs/MEAL_PLAN.md",
-  updated: "2026-07-14",
+  updated: "2026-07-16",
 
   /* fixed pre-gym fuel, counted in every day's totals */
   pregym: {
@@ -22,7 +24,7 @@ window.MEAL_PLAN = {
     time: "~7:15am",
     fixed: true,
     items: [
-      { food: "Banana – Robusta/Cavendish", amt: 1 }
+      { food: "Banana – Robusta/Cavendish", amt: 120, note: "1 banana" }
     ],
     extras: ["Black coffee (0 kcal)"]
   },
@@ -50,16 +52,16 @@ window.MEAL_PLAN = {
         {
           id: "breakfast-b", tag: "B", name: "Egg bhurji + toast",
           items: [
-            { food: "Whole egg", amt: 3 },
-            { food: "Egg white", amt: 3 },
-            { food: "Brown bread", amt: 2 },
+            { food: "Whole egg", amt: 150, note: "3 eggs" },
+            { food: "Egg white", amt: 90, note: "3 whites" },
+            { food: "Brown bread", amt: 60, note: "2 slices" },
             { name: "Bhurji veg (onion/tomato/capsicum)", unlinked: true, est: { p: 1, f: 0, c: 5, k: 25, fib: 1.5 } },
-            { food: "Ghee / oil", amt: 1 },
+            { food: "Ghee / oil", amt: 5, note: "1 tsp" },
             { food: "TruNativ Raw Concentrate", amt: 17.5, note: "½ scoop in water — matches Option A's protein" }
           ],
           extras: ["Black coffee (0 kcal)"],
           method: "Scramble eggs + whites with veg in 1 tsp oil on a non-stick pan. Toast bread dry. Shake the ½ scoop whey in water.",
-          claimed: { k: 520, p: 42, f: 22, c: 35, note: "doc's numbers exclude the ½ scoop whey it tells you to add" }
+          claimed: { k: 560, p: 52, f: 22, c: 36 }
         }
       ]
     },
@@ -72,9 +74,9 @@ window.MEAL_PLAN = {
           items: [
             { food: "Chicken breast (cooked)", amt: 150 },
             { food: "Rice (cooked)", amt: 150 },
-            { food: "Dal / rajma (cooked)", amt: 1, note: "1 katori ≈ 150 g" },
-            { food: "Green salad (dressed)", amt: 1, note: "big salad — half the plate" },
-            { food: "Ghee / oil", amt: 1 }
+            { food: "Dal / rajma (cooked)", amt: 150, note: "1 katori" },
+            { food: "Green salad (dressed)", amt: 150, note: "big salad — half the plate" },
+            { food: "Ghee / oil", amt: 5, note: "1 tsp" }
           ],
           method: "Batch-grill chicken, boil rice, pressure-cook rajma for 2–3 days. Assemble; load half the plate with salad.",
           claimed: { k: 615, p: 57, f: 13, c: 65 }
@@ -84,10 +86,10 @@ window.MEAL_PLAN = {
           items: [
             { food: "Fish – rohu/surmai (cooked)", amt: 175 },
             { food: "Rice (cooked)", amt: 150 },
-            { food: "Dal / rajma (cooked)", amt: 0.5, note: "½ katori" },
+            { food: "Dal / rajma (cooked)", amt: 75, note: "½ katori" },
             { food: "Curd (regular)", amt: 100 },
-            { food: "Green salad (dressed)", amt: 1 },
-            { food: "Ghee / oil", amt: 1 }
+            { food: "Green salad (dressed)", amt: 150, note: "1 katori" },
+            { food: "Ghee / oil", amt: 5, note: "1 tsp" }
           ],
           method: "Pan-sear or bake the fish with masala. Serve with rice, dal, a curd side, and salad.",
           claimed: { k: 610, p: 49, f: 19, c: 60 }
@@ -103,7 +105,7 @@ window.MEAL_PLAN = {
           items: [
             { food: "Greek yogurt / hung curd", amt: 150 },
             { food: "TruNativ Raw Concentrate", amt: 17.5, note: "½ scoop" },
-            { food: "Apple", amt: 1, note: "with skin" }
+            { food: "Apple", amt: 180, note: "1 apple, with skin" }
           ],
           method: "Whisk whey into the yogurt until smooth. Chop apple in.",
           claimed: { k: 270, p: 27, f: 5, c: 28 }
@@ -112,7 +114,7 @@ window.MEAL_PLAN = {
           id: "snack-b", tag: "B", name: "Evening whey + fruit",
           items: [
             { food: "TruNativ Raw Concentrate", amt: 35, note: "1 scoop in water" },
-            { food: "Guava", amt: 1 },
+            { food: "Guava", amt: 100, note: "1 guava" },
             { food: "Almonds", amt: 10 }
           ],
           method: "Shake whey with cold water. Eat guava + almonds alongside.",
@@ -128,19 +130,20 @@ window.MEAL_PLAN = {
           id: "dinner-a", tag: "A", name: "Eggs + sweet potato",
           hint: "convenient, higher fat",
           items: [
-            { food: "Whole egg", amt: 3 },
+            { food: "Whole egg", amt: 150, note: "3 eggs" },
             { food: "Sweet potato / shakarkandi", amt: 150 },
-            { food: "Mixed veg sabzi (1 tsp oil)", amt: 1, note: "the sabzi's oil is the meal's 1 tsp" }
+            { food: "Mixed veg sabzi (1 tsp oil)", amt: 150, note: "1 katori, its own oil" },
+            { food: "Ghee / oil", amt: 5, note: "1 tsp — the eggs' oil, on top of the veg's" }
           ],
-          method: "Boil or roast sweet potato (batch a tray). Fry eggs / make bhurji in the sabzi's 1 tsp oil with veg on the side.",
-          claimed: { k: 410, p: 22, f: 20, c: 37 }
+          method: "Boil or roast sweet potato (batch a tray). Fry eggs / make bhurji in 1 tsp oil, veg cooked separately.",
+          claimed: { k: 465, p: 22, f: 24, c: 39 }
         },
         {
           id: "dinner-b", tag: "B", name: "Chicken/fish + veg",
           hint: "leaner, higher protein — best when earlier meals ran low",
           items: [
             { food: "Chicken breast (cooked)", amt: 150, note: "or fish" },
-            { food: "Mixed veg sabzi (1 tsp oil)", amt: 1, note: "big stir-fry; its oil is the meal's 1 tsp" },
+            { food: "Mixed veg sabzi (1 tsp oil)", amt: 150, note: "big stir-fry; its oil is the meal's 1 tsp" },
             { food: "Sweet potato / shakarkandi", amt: 100, note: "or ½ cup rice" }
           ],
           method: "Stir-fry veg + protein in 1 tsp oil. Small carb on the side.",
@@ -165,8 +168,8 @@ window.MEAL_PLAN = {
           id: "meal4-b", tag: "B", name: "Tuna/egg-white salad",
           items: [
             { food: "Tuna (drained)", amt: 100, note: "1 tin — or 6 egg whites" },
-            { food: "Green salad (dressed)", amt: 1, note: "+ lemon" },
-            { food: "Ghee / oil", amt: 1, note: "olive oil" }
+            { food: "Green salad (dressed)", amt: 150, note: "1 katori + lemon" },
+            { food: "Ghee / oil", amt: 5, note: "1 tsp olive oil" }
           ],
           method: "Flake tuna over veg, dress with lemon + oil. Zero cooking (or quick-boil whites).",
           claimed: { k: 160, p: 25, f: 6, c: 4 }
@@ -188,7 +191,7 @@ window.MEAL_PLAN = {
       adjustment: {
         items: [
           { food: "TruNativ Raw Concentrate", amt: 35, note: "1 scoop, in milk or water" },
-          { food: "Apple", amt: 1, note: "or any fruit" }
+          { food: "Apple", amt: 180, note: "or any fruit" }
         ],
         text: "Skip the snack and add its protein back: fold 1 scoop whey + a fruit into breakfast or dinner. Nothing else changes."
       }
@@ -212,7 +215,7 @@ window.MEAL_PLAN = {
           { food: "Rolled oats (plain)", amt: 50 },
           { food: "Curd (regular)", amt: 150 },
           { food: "TruNativ Raw Concentrate", amt: 35, note: "1 scoop" },
-          { food: "Apple", amt: 1, note: "or any fruit" },
+          { food: "Apple", amt: 180, note: "or any fruit" },
           { food: "Chia seeds", amt: 12, note: "1 tbsp — soak overnight" }
         ],
         claimed: { k: 570, p: 45 }
@@ -220,10 +223,10 @@ window.MEAL_PLAN = {
       {
         slot: "Lunch", name: "Tuna + egg sandwich plate",
         items: [
-          { food: "Brown bread", amt: 2 },
+          { food: "Brown bread", amt: 60, note: "2 slices" },
           { food: "Tuna (drained)", amt: 100, note: "1 tin" },
-          { food: "Whole egg", amt: 2, note: "pre-boiled" },
-          { food: "Green salad (dressed)", amt: 1, note: "+ lemon" }
+          { food: "Whole egg", amt: 100, note: "2 eggs, pre-boiled" },
+          { food: "Green salad (dressed)", amt: 150, note: "1 katori + lemon" }
         ],
         claimed: { k: 440, p: 46 }
       },
@@ -232,7 +235,7 @@ window.MEAL_PLAN = {
         items: [
           { food: "TruNativ Raw Concentrate", amt: 35, note: "1 scoop" },
           { food: "Milk – Nandini toned", amt: 200 },
-          { food: "Banana – Robusta/Cavendish", amt: 1 }
+          { food: "Banana – Robusta/Cavendish", amt: 120, note: "1 banana" }
         ],
         claimed: { k: 345, p: 31 }
       },
@@ -241,8 +244,8 @@ window.MEAL_PLAN = {
         items: [
           { name: "Ready dal pouch (MTR/Tasty Bite)", unlinked: true, est: { p: 13, f: 8, c: 28, k: 240, fib: 6 } },
           { name: "Pre-cooked rice (½ pack ≈ 125 g)", unlinked: true, est: { p: 3.4, f: 0.4, c: 35, k: 163, fib: 0.5 } },
-          { food: "Whole egg", amt: 3, note: "pre-boiled" },
-          { food: "Green salad (dressed)", amt: 1 }
+          { food: "Whole egg", amt: 150, note: "3 eggs, pre-boiled" },
+          { food: "Green salad (dressed)", amt: 150, note: "1 katori" }
         ],
         claimed: { k: 605, p: 31 }
       }

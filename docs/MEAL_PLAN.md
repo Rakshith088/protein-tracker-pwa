@@ -4,6 +4,8 @@
 > Built from your TDEE (~2,475 kcal, verified two ways) minus a 500 kcal deficit. Non-veg, rice-first, home-cooked only — pulled from your existing recomp plan.
 >
 > **How to read this:** every meal and snack has **two options (A & B)** that play the same role, so you can rotate by mood/stock without touching your macros. Each has ingredients, method, and nutrition. Flex rules below tell you how to run **3 meals + 1 snack**, **3 meals no snack**, or **4 meals** — all landing on the same daily total.
+>
+> **App note (2026-07-16):** the app computes every meal's macros live from its food database — those computed numbers are the source of truth. The figures below are the original planning estimates (±5%), and they slightly under-count whey: they assumed a generic ~25 g-protein scoop, while the label-verified TruNativ scoop is 28.1 g.
 
 ---
 
@@ -26,7 +28,7 @@ Pre-gym banana is counted in the totals. Take **creatine 5 g** and **1 tbsp chia
 | Option | Ingredients | Method | Nutrition |
 |---|---|---|---|
 | **A — Oats + whey shake** | 50 g plain rolled oats · 200 ml toned milk (Nandini) · 1.5 scoop whey · 1 tbsp chia · creatine 5 g | Cook oats in the milk (or soak overnight). Cool slightly, then stir in whey + chia + creatine. Never add whey to boiling oats. | **~550 kcal · 51 P · 15 F · 53 C** |
-| **B — Egg bhurji + toast** | 3 whole eggs + 3 egg whites · 2 slices brown bread · onion/tomato/capsicum · 1 tsp oil · black coffee | Scramble eggs + whites with veg in 1 tsp oil on a non-stick pan. Toast bread dry. *Add ½ scoop whey in water to match Option A's protein.* | **~520 kcal · 42 P · 22 F · 35 C** |
+| **B — Egg bhurji + toast** | 3 whole eggs + 3 egg whites · 2 slices brown bread · onion/tomato/capsicum · 1 tsp oil · black coffee | Scramble eggs + whites with veg in 1 tsp oil on a non-stick pan. Toast bread dry. *Add ½ scoop whey in water to match Option A's protein.* | **~560 kcal · 52 P · 22 F · 36 C** *(incl. the ½ scoop whey)* |
 
 ---
 
@@ -52,7 +54,7 @@ Pre-gym banana is counted in the totals. Take **creatine 5 g** and **1 tbsp chia
 
 | Option | Ingredients | Method | Nutrition |
 |---|---|---|---|
-| **A — Eggs + sweet potato** *(convenient, higher fat)* | 3 whole eggs · 150 g sweet potato · sautéed veg · 1 tsp oil | Boil or roast sweet potato (batch a tray). Fry eggs / make bhurji in 1 tsp oil with veg on the side. | **~410 kcal · 22 P · 20 F · 37 C** |
+| **A — Eggs + sweet potato** *(convenient, higher fat)* | 3 whole eggs · 150 g sweet potato · sautéed veg · 1 tsp oil | Boil or roast sweet potato (batch a tray). Fry eggs / make bhurji in 1 tsp oil, veg cooked separately. | **~465 kcal · 22 P · 24 F · 39 C** *(eggs' oil counted on top of the veg's)* |
 | **B — Chicken/fish + veg** *(leaner, higher protein)* | 150 g cooked chicken breast (or fish) · big mixed-veg stir-fry · 100 g sweet potato or ½ cup rice · 1 tsp oil | Stir-fry veg + protein in 1 tsp oil. Small carb on the side. Best on days breakfast/lunch ran lower on protein. | **~420 kcal · 50 P · 10 F · 28 C** |
 
 ---
