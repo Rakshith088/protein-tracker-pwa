@@ -206,59 +206,60 @@
       const fbox=$("fibbox"); if(fbox) fbox.classList.toggle("met", t.fib>=targets.fib);
     }
     $("footTargets").textContent="Targets: "+targets.p+" g protein · "+targets.k+" kcal · fat "+targets.f+" g · carbs "+targets.c+" g · fibre "+targets.fib+" g";
-    renderRecommender(t);
+    renderRecommender();
     renderLog();
   }
 
-  /* ---------- recommender ---------- */
-  function renderRecommender(t){
-    const box=$("rec");
-    const remP=round(targets.p-t.p), remK=Math.round(targets.k-t.k);
-    if(remP<=2){
-      box.classList.add("done");
-      const msg = remK>150 ? ("Protein done — about <b>"+remK+" kcal</b> of room left if you're hungry.")
-              : remK<-40 ? ("Protein done. You're <b>"+Math.abs(remK)+" kcal</b> over — ease off for the rest of the day.")
-              : "Protein done and calories on target. You're set.";
-      box.innerHTML='<div class="rh"><h3>Close the gap</h3></div><div class="celebrate">✓ '+targets.p+' g protein reached</div><div class="sub" style="margin-top:6px">'+msg+'</div>';
+  /* ---------- recommender (multi-macro engine lives in recommend.js) ----------
+     Priority protein -> calories -> fibre -> fat/carb flex. First suggestion
+     is the next plan meal adapted to the live targets; ad-hoc closers below. */
+  function renderRecommender(){
+    const box=$("rec"); if(!box)return;
+    if(!window.RECOMMEND||!window.MEAL_PLAN){box.innerHTML="";return;}
+    const now=new Date();
+    const r=RECOMMEND.recommend(entries,targets,window.MEAL_PLAN,FOODS,
+      {h:now.getHours()+now.getMinutes()/60,dateKey:dateKey});
+    box.classList.toggle("done",r.kind==="done");
+    let html='<div class="rh"><h3>'+(r.kind==="meal"?"From your plan":r.headline)+'</h3></div>';
+    if(r.kind==="done"){
+      box.innerHTML=html+'<div class="celebrate">✓ '+r.headline+'</div><div class="sub" style="margin-top:6px">'+r.reasoning+'</div>';
       return;
     }
-    box.classList.remove("done");
-    const scored=FOODS.filter(f=>{const g=perGram(f);return g.p>0&&g.k>0&&(g.p/g.k)>=0.09;})
-      .map(f=>{
-        const g=perGram(f), dA=defAmt(f);
-        const need=remP/g.p;
-        const amt=Math.min(need,dA*1.5);              // realistic single portion
-        const rAmt=Math.max(f.step,Math.round(amt/f.step)*f.step);
-        const addP=g.p*rAmt, addK=g.k*rAmt;
-        return {f,amt:rAmt,addP,addK,partial:need>dA*1.5,fits:addK<=remK+40,eff:g.k/g.p};
-      })
-      .filter(s=> s.addP >= Math.min(10, Math.max(4, remP*0.3)))   // must make a real dent
-      .sort((a,b)=> (a.fits!==b.fits ? (a.fits?-1:1) : a.eff-b.eff));
-
-    const pool=scored.slice(0,10);
-    if(!pool.length){ box.innerHTML='<div class="rh"><h3>Close the gap</h3></div><div class="sub">'+nice(remP)+' g protein left. Nothing in your list fits the remaining calories — a lean protein (whey, egg whites, tuna) is your best bet.</div>'; return; }
-    const seed=(new Date().getDate()+entries.length)%pool.length;
-    const rot=pool.slice(seed).concat(pool.slice(0,seed));
-    const cands=[], cats=new Set();
-    for(const s of rot){ if(cands.length>=3)break; if(cats.has(s.f.cat))continue; cats.add(s.f.cat); cands.push(s); }
-    for(const s of rot){ if(cands.length>=3)break; if(!cands.includes(s))cands.push(s); }
-    cands.sort((a,b)=> (a.fits!==b.fits ? (a.fits?-1:1) : a.eff-b.eff));
-
-    let html='<div class="rh"><h3>Close the gap</h3></div>'+
-      '<div class="sub">You have <b>'+nice(remP)+' g protein</b> and <b>'+remK+' kcal</b> left today. Quickest ways to close it:</div><div class="opts">';
-    cands.forEach((s,i)=>{
-      const over = !s.fits ? ' <span class="over">(+'+Math.round(s.addK-remK)+' over kcal)</span>' : '';
-      const partial = s.partial ? ' · gets you part-way' : '';
-      html+='<div class="opt"><div class="oi"><div class="on"></div>'+
-        '<div class="oq"><b>+'+nice(round(s.addP))+'g P</b> · '+Math.round(s.addK)+' kcal'+over+partial+'</div></div>'+
-        '<button class="oadd" data-i="'+i+'">'+fmtAmt(s.amt)+' '+s.f.unit+'</button></div>';
-    });
-    box.innerHTML=html+'</div>';
+    html+='<div class="sub">'+r.reasoning+'</div>';
+    if(r.kind==="meal"){
+      const m=r.meal;
+      html+='<div class="recmeal"><div class="rmh"><span class="potag">'+m.tag+'</span><span class="rmn"></span></div>'+
+        '<ul class="poing">'+m.items.map(it=>'<li>'+esc(planItemLabel(it))+'</li>').join("")+'</ul>'+
+        '<div class="pomac">'+macLine(m.totals)+'</div>'+
+        '<button class="rlog" id="recLog">Log this meal</button></div>';
+    }
+    if(r.adhoc&&r.adhoc.length){
+      html+='<div class="sub" style="margin-top:10px">'+(r.kind==="meal"?"Or close it à la carte:":"Quickest ways to close it:")+'</div><div class="opts">';
+      r.adhoc.forEach((s,i)=>{
+        const over=!s.fits?' <span class="over">(+'+s.overK+' over kcal)</span>':'';
+        const partial=s.partial?' · gets you part-way':'';
+        const gain= s.mode==="fibre" ? '+'+nice(round(s.adds.fib))+'g fibre' : '+'+nice(round(s.adds.p))+'g P';
+        html+='<div class="opt"><div class="oi"><div class="on"></div>'+
+          '<div class="oq"><b>'+gain+'</b> · '+Math.round(s.adds.k)+' kcal'+over+partial+'</div></div>'+
+          '<button class="oadd" data-i="'+i+'">'+fmtAmt(s.amt)+' '+s.unit+'</button></div>';
+      });
+      html+='</div>';
+    }
+    box.innerHTML=html;
+    const rmn=box.querySelector(".rmn"); if(rmn&&r.meal) rmn.textContent=r.meal.name;
     box.querySelectorAll(".oadd").forEach(btn=>{
-      const s=cands[+btn.dataset.i];
-      btn.parentElement.querySelector(".on").textContent=s.f.n;
-      btn.onclick=()=>openSheet(s.f,s.amt);
+      const s=r.adhoc[+btn.dataset.i];
+      btn.parentElement.querySelector(".on").textContent=s.food;
+      btn.onclick=()=>{const f=findFood(s.food); if(f)openSheet(f,s.amt);};
     });
+    const lg=$("recLog");
+    if(lg) lg.onclick=()=>{
+      const m=r.meal;
+      addEntry({n:m.slot+" "+m.tag+" — "+m.name+" (plan)",amt:null,unit:"",meal:m.logSlot,
+        note:m.items.map(planItemLabel).join(" · "),
+        p:m.totals.p,f:m.totals.f,c:m.totals.c,k:m.totals.k,fib:m.totals.fib});
+      toast("+"+nice(round(m.totals.p))+" g protein · "+m.name);
+    };
   }
 
   /* ---------- today's log, grouped by meal ---------- */

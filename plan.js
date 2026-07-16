@@ -40,7 +40,7 @@ window.MEAL_PLAN = {
         {
           id: "breakfast-a", tag: "A", name: "Oats + whey shake",
           items: [
-            { food: "Rolled oats (plain)", amt: 50 },
+            { food: "Rolled oats (plain)", amt: 50, flex: "carb" },
             { food: "Milk – Nandini toned", amt: 200 },
             { food: "TruNativ Raw Concentrate", amt: 52.5, note: "1.5 scoop" },
             { food: "Chia seeds", amt: 12, note: "1 tbsp" }
@@ -54,7 +54,7 @@ window.MEAL_PLAN = {
           items: [
             { food: "Whole egg", amt: 150, note: "3 eggs" },
             { food: "Egg white", amt: 90, note: "3 whites" },
-            { food: "Brown bread", amt: 60, note: "2 slices" },
+            { food: "Brown bread", amt: 60, note: "2 slices", flex: "carb" },
             { food: "Bhurji veg (onion/tomato/capsicum)", amt: 100, note: "1 katori raw mix" },
             { food: "Ghee / oil", amt: 5, note: "1 tsp" },
             { food: "TruNativ Raw Concentrate", amt: 17.5, note: "½ scoop in water — matches Option A's protein" }
@@ -73,7 +73,7 @@ window.MEAL_PLAN = {
           id: "lunch-a", tag: "A", name: "Chicken + rice + rajma",
           items: [
             { food: "Chicken breast (cooked)", amt: 150 },
-            { food: "Rice (cooked)", amt: 150 },
+            { food: "Rice (cooked)", amt: 150, flex: "carb" },
             { food: "Dal / rajma (cooked)", amt: 150, note: "1 katori" },
             { food: "Green salad (dressed)", amt: 150, note: "big salad — half the plate" },
             { food: "Ghee / oil", amt: 5, note: "1 tsp" }
@@ -85,7 +85,7 @@ window.MEAL_PLAN = {
           id: "lunch-b", tag: "B", name: "Fish + rice + dal + curd",
           items: [
             { food: "Fish – rohu/surmai (cooked)", amt: 175 },
-            { food: "Rice (cooked)", amt: 150 },
+            { food: "Rice (cooked)", amt: 150, flex: "carb" },
             { food: "Dal / rajma (cooked)", amt: 75, note: "½ katori" },
             { food: "Curd (regular)", amt: 100 },
             { food: "Green salad (dressed)", amt: 150, note: "1 katori" },
@@ -131,7 +131,7 @@ window.MEAL_PLAN = {
           hint: "convenient, higher fat",
           items: [
             { food: "Whole egg", amt: 150, note: "3 eggs" },
-            { food: "Sweet potato / shakarkandi", amt: 150 },
+            { food: "Sweet potato / shakarkandi", amt: 150, flex: "carb" },
             { food: "Mixed veg sabzi (1 tsp oil)", amt: 150, note: "1 katori, its own oil" },
             { food: "Ghee / oil", amt: 5, note: "1 tsp — the eggs' oil, on top of the veg's" }
           ],
@@ -144,7 +144,7 @@ window.MEAL_PLAN = {
           items: [
             { food: "Chicken breast (cooked)", amt: 150, note: "or fish" },
             { food: "Mixed veg sabzi (1 tsp oil)", amt: 150, note: "big stir-fry; its oil is the meal's 1 tsp" },
-            { food: "Sweet potato / shakarkandi", amt: 100, note: "or ½ cup rice" }
+            { food: "Sweet potato / shakarkandi", amt: 100, note: "or ½ cup rice", flex: "carb" }
           ],
           method: "Stir-fry veg + protein in 1 tsp oil. Small carb on the side.",
           claimed: { k: 420, p: 50, f: 10, c: 28 }
