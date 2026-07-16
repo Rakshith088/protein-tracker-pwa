@@ -1,13 +1,20 @@
 /* Protein Tracker PWA — logic (v2)
-   Storage (localStorage, per-device, offline):
+   Storage (localStorage, per-device, offline — the source of truth):
      pt:log:<YYYY-MM-DD>  entries for that day
      pt:customfoods       permanently saved foods
-     pt:targets           {p,k,f,c}
+     pt:targets           {p,k,f,c,fib} — externally derived (weekly coaching
+                          review); never assume specific values
      pt:weights           [{d:'YYYY-MM-DD', kg:Number}]
+     pt:waist             [{d:'YYYY-MM-DD', cm:Number}] — weekly-ish
      pt:taps              {foodName: tapCount}   -> drives favourites
+     pt:lastexport        ISO timestamp of the last JSON export
+     pt:nudgesnooze       ISO timestamp when the export nudge was dismissed
 */
 (function(){
   "use strict";
+  /* First-run fallback only, until the first coaching targets are entered in
+     Settings. pt:targets is externally derived and drifts — no logic or copy
+     anywhere may assume these specific values. */
   const DEFAULT_TARGETS={p:160,k:1975,f:58,c:200,fib:30};
   const CIRC=2*Math.PI*88;
   const MEALS=["Breakfast","Lunch","Snack","Dinner"];
@@ -82,7 +89,7 @@
   function warn(msg){ try{console.warn("[tracker] "+msg);}catch(e){} }
   const prog=$("prog"); prog.style.strokeDasharray=CIRC;
 
-  let entries=[], customFoods=[], FOODS=[], targets={}, weights=[], taps={};
+  let entries=[], customFoods=[], FOODS=[], targets={}, weights=[], waist=[], taps={};
   let sheetFood=null, sheetMeal=null, sheetMode="log", histDate=null;
   const dateKey=todayKey();
 
@@ -104,6 +111,7 @@
   function saveCustom(){lsSet("pt:customfoods",customFoods);}
   function saveTargets(){lsSet("pt:targets",targets);}
   function saveWeights(){lsSet("pt:weights",weights);}
+  function saveWaist(){lsSet("pt:waist",waist);}
   function saveTaps(){lsSet("pt:taps",taps);}
   function allLogKeys(){
     const out=[];
@@ -473,12 +481,14 @@
     if(prevSlice.length<3){t.innerHTML="Building your baseline — <b>"+cur.toFixed(1)+" kg</b> average so far. A second week makes the trend readable.";return;}
     const prev=prevSlice.reduce((a,w)=>a+w.kg,0)/prevSlice.length;
     const diff=cur-prev;
+    /* Rate vs the 0.3–0.5 kg/week goal only — no prescriptions.
+       Adjustment calls belong to the weekly coaching review, not this app. */
     let verdict;
-    if(diff<=-0.7) verdict='<span class="warn">Faster than ideal</span> — that pace risks muscle. Consider adding ~150 kcal back.';
-    else if(diff<=-0.25) verdict='<span class="good">On target</span> — this is the 0.3–0.5 kg/week range you want.';
-    else if(diff<=-0.05) verdict='Slightly slow but moving. Give it another week before changing anything.';
-    else if(diff<0.25) verdict='Flat. If this holds 2–3 weeks, add ~1,500 steps/day before cutting food.';
-    else verdict='<span class="warn">Trending up.</span> Worth checking your logging is complete before adjusting.';
+    if(diff<=-0.7) verdict='<span class="warn">Faster than the 0.3–0.5 kg/week goal.</span>';
+    else if(diff<=-0.25) verdict='<span class="good">On pace</span> — inside the 0.3–0.5 kg/week goal.';
+    else if(diff<=-0.05) verdict='Losing, but slower than the 0.3–0.5 kg/week goal.';
+    else if(diff<0.25) verdict='Flat week on week.';
+    else verdict='<span class="warn">Up week on week.</span>';
     t.innerHTML='Week on week: <b>'+(diff>0?"+":"")+diff.toFixed(2)+' kg</b> ('+prev.toFixed(1)+' → '+cur.toFixed(1)+' kg). '+verdict;
   }
   $("wtAdd").onclick=()=>{
@@ -489,6 +499,28 @@
     weights.sort((a,b)=>a.d<b.d?-1:1);
     saveWeights();renderWeight();toast(ex?"Weight updated":"Weight logged");
   };
+
+  /* ---------- waist (weekly, feeds the coaching export) ---------- */
+  function daysBetween(isoOrKey){
+    const d=new Date(isoOrKey); if(isNaN(d))return null;
+    return Math.floor((Date.now()-d.getTime())/86400000);
+  }
+  function renderWaist(){
+    const line=$("waLast"); if(!line)return;
+    if(!waist.length){line.textContent="Once a week is plenty — it rides along in the export.";return;}
+    const last=waist[waist.length-1];
+    const days=daysBetween(last.d);
+    line.innerHTML='Last: <b>'+last.cm.toFixed(1)+' cm</b> · '+prettyDate(keyToDate(last.d))+
+      (days>=7?' — due for a fresh one':'');
+  }
+  bind("waAdd","click",()=>{
+    const cm=parseFloat($("waIn").value);
+    if(!cm||cm<40||cm>200){toast("Enter a waist in cm");return;}
+    const ex=waist.find(w=>w.d===dateKey);
+    if(ex)ex.cm=cm; else waist.push({d:dateKey,cm:cm});
+    waist.sort((a,b)=>a.d<b.d?-1:1);
+    saveWaist();$("waIn").value="";renderWaist();toast(ex?"Waist updated":"Waist logged");
+  });
 
   /* ---------- 7-day strip (tappable) ---------- */
   function renderWeek(){
@@ -550,7 +582,8 @@
     $("tP").value=targets.p;$("tK").value=targets.k;$("tF").value=targets.f;$("tC").value=targets.c;
     const tf=$("tFib"); if(tf) tf.value=targets.fib;
     const days=allLogKeys().length;
-    $("statLine").textContent=days+" day"+(days===1?"":"s")+" logged · "+customFoods.length+" custom food"+(customFoods.length===1?"":"s")+" · "+meals.length+" meal"+(meals.length===1?"":"s")+" · "+weights.length+" weigh-in"+(weights.length===1?"":"s");
+    $("statLine").textContent=days+" day"+(days===1?"":"s")+" logged · "+customFoods.length+" custom food"+(customFoods.length===1?"":"s")+" · "+meals.length+" meal"+(meals.length===1?"":"s")+" · "+weights.length+" weigh-in"+(weights.length===1?"":"s")+" · "+waist.length+" waist";
+    const sl=$("storageLine"); if(sl) sl.textContent=storageLineText();
     showSheet("setSheet","setBack");
   }
   function closeSettings(){hideSheet("setSheet","setBack");}
@@ -575,16 +608,38 @@
     const a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();
     setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},400);
   }
+  /* The JSON export is an interface, not a backup: it feeds the weekly
+     coaching review that produces new pt:targets. Always full history,
+     never deltas. Schema history: 3 = v1 backup; 4 = adds schema field,
+     waist series. Import accepts 3 and 4. */
   function collectAll(){
     const logs={};
     allLogKeys().forEach(k=>{logs[k.replace("pt:log:","")]=lsGet(k,[]);});
     logs[dateKey]=entries;
-    return {app:"protein-tracker",version:3,exported:new Date().toISOString(),targets,customFoods,meals,weights,taps,logs};
+    return {app:"protein-tracker",version:4,schema:4,exported:new Date().toISOString(),
+            targets,customFoods,meals,weights,waist,taps,logs};
   }
-  $("expJson").onclick=()=>{
-    download("protein-tracker-backup-"+dateKey+".json",JSON.stringify(collectAll(),null,2),"application/json");
-    toast("Backup downloaded");
-  };
+  function markExported(){
+    lsSet("pt:lastexport",new Date().toISOString());
+    try{localStorage.removeItem("pt:nudgesnooze");}catch(e){}
+    renderNudge();
+  }
+  async function shareExport(){
+    const json=JSON.stringify(collectAll(),null,2);
+    const name="protein-tracker-export-"+dateKey+".json";
+    try{
+      const file=new File([json],name,{type:"application/json"});
+      if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+        await navigator.share({files:[file],title:"Protein Tracker export"});
+        markExported();toast("Export shared");return;
+      }
+    }catch(err){
+      if(err&&err.name==="AbortError")return;   // user closed the share sheet — not an export
+    }
+    download(name,json,"application/json");
+    markExported();toast("Export downloaded");
+  }
+  bind("expJson","click",shareExport);
   $("expCsv").onclick=()=>{
     const data=collectAll();
     const esc=v=>{v=String(v==null?"":v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
@@ -618,6 +673,7 @@
         if(d.customFoods)lsSet("pt:customfoods",d.customFoods);
         if(d.meals)lsSet("pt:meals",d.meals);
         if(d.weights)lsSet("pt:weights",d.weights);
+        if(d.waist)lsSet("pt:waist",d.waist);   // absent in schema-3 backups — fine
         if(d.taps)lsSet("pt:taps",d.taps);
         toast("Backup restored");
         setTimeout(()=>location.reload(),700);
@@ -626,6 +682,63 @@
     r.readAsText(file);
     this.value="";
   };
+
+  /* ---------- durability (localStorage stays the source of truth;
+     this is about not losing it, not about sync) ---------- */
+  const storageState={persist:null,usage:null,quota:null};
+  function fmtBytes(n){
+    if(n==null)return "?";
+    if(n<1024*1024)return Math.max(1,Math.round(n/1024))+" KB";
+    if(n<1024*1024*1024)return (n/1048576).toFixed(1)+" MB";
+    return (n/1073741824).toFixed(1)+" GB";
+  }
+  function storageLineText(){
+    let bits=[];
+    if(storageState.persist===true) bits.push("Persistent storage: granted — the browser won't evict this app's data under pressure.");
+    else if(storageState.persist===false) bits.push("Persistent storage: not granted — keep exporting; the browser may evict data under storage pressure.");
+    else bits.push("Persistent storage: unknown on this browser.");
+    if(storageState.quota) bits.push("Using "+fmtBytes(storageState.usage)+" of "+fmtBytes(storageState.quota)+".");
+    const last=lsGet("pt:lastexport",null);
+    if(last){const d=daysBetween(last);bits.push("Last export: "+(d===0?"today":d+" day"+(d===1?"":"s")+" ago")+".");}
+    else bits.push("Last export: never.");
+    return bits.join(" ");
+  }
+  function initDurability(){
+    if(navigator.storage&&navigator.storage.persist){
+      navigator.storage.persisted()
+        .then(p=>p?true:navigator.storage.persist())
+        .then(g=>{storageState.persist=!!g;})
+        .catch(()=>{});
+    }
+    if(navigator.storage&&navigator.storage.estimate){
+      navigator.storage.estimate().then(e=>{
+        storageState.usage=e.usage;storageState.quota=e.quota;
+        if(e.quota&&e.usage/e.quota>0.8) toast("Storage almost full — export your data");
+      }).catch(()=>{});
+    }
+  }
+
+  /* ---------- days-since-export nudge (dismiss = snooze, it comes back) ---------- */
+  const NUDGE_AFTER_DAYS=7, NUDGE_SNOOZE_DAYS=3, NUDGE_MIN_LOGGED_DAYS=3;
+  function renderNudge(){
+    const el=$("nudge"); if(!el)return;
+    const last=lsGet("pt:lastexport",null);
+    const snooze=lsGet("pt:nudgesnooze",null);
+    let msg=null;
+    if(last){
+      const d=daysBetween(last);
+      if(d!=null&&d>=NUDGE_AFTER_DAYS) msg="Last export was "+d+" days ago — the coach review needs fresh data.";
+    } else if(allLogKeys().length>=NUDGE_MIN_LOGGED_DAYS){
+      msg="You've never exported — the weekly coach review runs on the JSON export.";
+    }
+    if(msg&&snooze!=null){const s=daysBetween(snooze);if(s!=null&&s<NUDGE_SNOOZE_DAYS)msg=null;}
+    if(!msg){el.hidden=true;el.innerHTML="";return;}
+    el.hidden=false;
+    el.innerHTML='<span class="ntxt"></span><span class="nacts"><button class="ngo">Export</button><button class="nlater">Later</button></span>';
+    el.querySelector(".ntxt").textContent=msg;
+    el.querySelector(".ngo").onclick=shareExport;
+    el.querySelector(".nlater").onclick=()=>{lsSet("pt:nudgesnooze",new Date().toISOString());renderNudge();};
+  }
 
   /* ---------- appbar ---------- */
   window.addEventListener("scroll",()=>{$("appbar").classList.toggle("scrolled",window.scrollY>8);},{passive:true});
@@ -794,89 +907,156 @@
     saveMeals();closeBuilder();renderMeals();renderFavs();toast('"'+name+'" saved');
   });
 
-  /* ================= PLAN ================= */
+  /* ================= PLAN (data-driven from plan.js) =================
+     Every macro shown here is recomputed live from the food DB — the plan
+     document's own claimed numbers are never rendered. Estimated (unlinked)
+     items are marked "est". */
   let planRendered=false;
-  function mdInline(t){
-    return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
-      .replace(/`([^`]+)`/g,"<code>$1</code>")
-      .replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>")
-      .replace(/(^|[^*])\*([^*]+)\*/g,"$1<em>$2</em>");
+  const PLAN=window.MEAL_PLAN||null;
+
+  function planItemMacros(it){
+    if(it.est) return it.est;
+    const f=findFood(it.food);
+    if(!f){warn("plan item not in food DB: "+it.food);return null;}
+    return {p:f.per.p*it.amt,f:f.per.f*it.amt,c:f.per.c*it.amt,k:f.per.k*it.amt,fib:(f.per.fib||0)*it.amt};
   }
-  function mdBlocks(lines){
-    let html="",i=0;
-    while(i<lines.length){
-      const l=lines[i];
-      if(/^\s*$/.test(l)){i++;continue;}
-      if(/^---+$/.test(l.trim())){html+="<hr>";i++;continue;}
-      if(/^### /.test(l)){html+="<h3>"+mdInline(l.slice(4))+"</h3>";i++;continue;}
-      if(/^\|/.test(l)){                                    // table
-        const rows=[];
-        while(i<lines.length&&/^\|/.test(lines[i])){rows.push(lines[i]);i++;}
-        const cells=r=>r.trim().replace(/^\||\|$/g,"").split("|").map(c=>c.trim());
-        const head=cells(rows[0]);
-        const body=rows.slice(rows.length>1&&/^\|[\s\-:|]+\|?$/.test(rows[1])?2:1);
-        html+='<div class="tablewrap"><table><thead><tr>'+head.map(h=>"<th>"+mdInline(h)+"</th>").join("")+
-              "</tr></thead><tbody>"+body.map(r=>"<tr>"+cells(r).map(c=>"<td>"+mdInline(c)+"</td>").join("")+"</tr>").join("")+
-              "</tbody></table></div>";
-        if(head.length>2) html+='<div class="scrollhint">swipe table sideways →</div>';
-        continue;
-      }
-      if(/^> /.test(l)){
-        const buf=[];
-        while(i<lines.length&&/^>/.test(lines[i])){buf.push(lines[i].replace(/^>\s?/,""));i++;}
-        html+="<blockquote>"+mdBlocks(buf)+"</blockquote>";continue;
-      }
-      if(/^[-*] /.test(l)){
-        const buf=[];
-        while(i<lines.length&&/^[-*] /.test(lines[i])){buf.push(lines[i].replace(/^[-*] /,""));i++;}
-        html+="<ul>"+buf.map(b=>"<li>"+mdInline(b)+"</li>").join("")+"</ul>";continue;
-      }
-      const para=[];
-      while(i<lines.length&&!/^\s*$/.test(lines[i])&&!/^[|>#-]/.test(lines[i])){para.push(lines[i]);i++;}
-      if(para.length) html+="<p>"+mdInline(para.join(" "))+"</p>";
-      else i++;
-    }
-    return html;
+  function planSum(items){
+    const t={p:0,f:0,c:0,k:0,fib:0,est:false};
+    (items||[]).forEach(it=>{
+      const m=planItemMacros(it); if(!m)return;
+      t.p+=m.p;t.f+=m.f;t.c+=m.c;t.k+=m.k;t.fib+=m.fib;
+      if(it.est)t.est=true;
+    });
+    return t;
+  }
+  function planItemLabel(it){
+    if(!it.food) return it.name;
+    const f=findFood(it.food);
+    const unit=f?f.unit:"";
+    let s;
+    if(unit==="g"||unit==="ml") s=fmtAmt(it.amt)+" "+unit+" "+it.food;
+    else if(unit==="katori"||unit==="tsp") s=it.food+" — "+fmtAmt(it.amt)+" "+unit;
+    else s=it.food+" × "+fmtAmt(it.amt);
+    if(it.note)s+=" ("+it.note+")";
+    return s;
+  }
+  function macLine(t,withFib){
+    return '<b>'+nice(round(t.p))+'g P</b> · '+Math.round(t.k)+' kcal · F '+nice(round(t.f))+
+      ' · C '+Math.round(t.c)+(withFib!==false?' · Fib '+nice(round(t.fib)):'')+
+      (t.est?' <span class="est">est</span>':'');
+  }
+  function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+  function optionCard(o){
+    const t=planSum(o.items);
+    let h='<div class="popt"><div class="poh"><span class="potag">'+esc(o.tag)+'</span>'+
+      '<span class="ponm">'+esc(o.name)+'</span></div>'+
+      (o.hint?'<div class="pohint">'+esc(o.hint)+'</div>':'')+
+      '<div class="pomac">'+macLine(t)+'</div><ul class="poing">';
+    o.items.forEach(it=>{h+='<li'+(it.unlinked?' class="unlinked"':'')+'>'+esc(planItemLabel(it))+(it.unlinked?' <span class="est">est</span>':'')+'</li>';});
+    (o.extras||[]).forEach(x=>{h+='<li class="extra">'+esc(x)+'</li>';});
+    h+='</ul><div class="pomethod">'+esc(o.method)+'</div></div>';
+    return h;
+  }
+  function slotTotals(slotName,optIdx){
+    if(slotName==="pregym") return planSum(PLAN.pregym.items);
+    const s=PLAN.slots.find(x=>x.slot===slotName);
+    return s?planSum(s.options[optIdx||0].items):{p:0,f:0,c:0,k:0,fib:0};
+  }
+  function accSection(title,html,open){
+    return '<details class="acc"'+(open?' open':'')+'><summary><span class="ttl">'+esc(title)+'</span>'+
+      '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>'+
+      '<div class="accbody">'+html+'</div></details>';
   }
   function renderPlan(){
     if(planRendered)return;
-    const src=$("planDoc"); if(!src)return;
-    const md=src.textContent.trim().split("\n");
-    // overview card
-    $("planOverview").innerHTML=
-      '<div class="planhero"><h2>Your fat-loss plan</h2>'+
+    const ov=$("planOverview"),body=$("planBody");
+    if(!ov||!body)return;
+    if(!PLAN){body.innerHTML='<div class="empty">Plan data failed to load — fully close and reopen the app.</div>';return;}
+    // overview: live targets only — they come from the weekly coaching review
+    ov.innerHTML=
+      '<div class="planhero"><h2>Your plan</h2>'+
       '<div class="plangrid">'+
         '<div><div class="pk">Protein</div><div class="pv hero">'+targets.p+' g</div></div>'+
         '<div><div class="pk">Calories</div><div class="pv">'+targets.k+'</div></div>'+
         '<div><div class="pk">Fat</div><div class="pv">'+targets.f+' g</div></div>'+
         '<div><div class="pk">Carbs</div><div class="pv">'+targets.c+' g</div></div>'+
         '<div><div class="pk">Fibre</div><div class="pv">'+targets.fib+' g</div></div>'+
-        '<div><div class="pk">Deficit</div><div class="pv">−500</div></div>'+
+        '<div><div class="pk">Pace goal</div><div class="pv">0.3–0.5</div></div>'+
       '</div>'+
-      '<p class="pnote">TDEE ≈ 2,475 kcal (76 kg · 174 cm · 31 · male, verified against your watch data) minus a 500 kcal deficit. Aim to lose 0.3–0.5 kg/week.</p></div>';
-    // split into ## sections -> accordions
-    const body=$("planBody");body.innerHTML="";
+      '<p class="pnote">Targets come from the weekly coaching review — update them in Settings after each check-in. Pace goal is kg lost per week (7-day average).</p>'+
+      '<div class="nn"><b>Non-negotiables:</b> hit protein (within ~'+PLAN.nonNegotiables.proteinBand+
+      ' g of your '+targets.p+' g target) and calories every day. '+esc(PLAN.nonNegotiables.flex)+' '+
+      esc(PLAN.nonNegotiables.safetyNet)+'</div></div>';
+
     const doc=document.createElement("div");doc.className="pdoc";
-    let intro=[],sections=[],cur=null;
-    md.forEach(line=>{
-      if(/^## /.test(line)){cur={title:line.slice(3).trim(),lines:[]};sections.push(cur);}
-      else if(/^# /.test(line)){/* title — shown in the hero card */}
-      else if(cur) cur.lines.push(line);
-      else intro.push(line);
+    let html="";
+
+    // the daily shape
+    const pre=planSum(PLAN.pregym.items);
+    let shapeHtml='<div class="tablewrap"><table class="tight"><thead><tr><th>Time</th><th>Slot</th></tr></thead><tbody>'+
+      '<tr><td>'+esc(PLAN.pregym.time)+'</td><td><b>'+esc(PLAN.pregym.label)+'</b> (fixed) — '+
+      esc(PLAN.pregym.items.map(planItemLabel).join(" + "))+' + black coffee → '+macLine(pre,false)+'</td></tr>';
+    PLAN.slots.forEach(s=>{
+      shapeHtml+='<tr><td>'+esc(s.time)+'</td><td><b>'+esc(s.slot)+'</b>'+(s.optional?' <i>(optional)</i>':'')+
+        ' — '+esc(s.role)+'</td></tr>';
     });
-    if(intro.join("").trim()){
-      const d=document.createElement("div");d.innerHTML=mdBlocks(intro);doc.appendChild(d);
-    }
-    sections.forEach((sec,idx)=>{
-      const acc=document.createElement("details");acc.className="acc";acc.open=(idx===0);
-      acc.innerHTML='<summary><span class="ttl"></span>'+
-        '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>'+
-        '<div class="accbody"></div>';
-      acc.querySelector(".ttl").textContent=sec.title;
-      acc.querySelector(".accbody").innerHTML=mdBlocks(sec.lines);
-      doc.appendChild(acc);
+    shapeHtml+='</tbody></table></div><p>'+esc(PLAN.breakfastNote)+'</p>';
+    html+=accSection("The daily shape",shapeHtml,true);
+
+    // each meal slot with A/B options
+    PLAN.slots.forEach(s=>{
+      let inner='<div class="porole">'+esc(s.role)+'</div>';
+      s.options.forEach(o=>{inner+=optionCard(o);});
+      html+=accSection(s.slot+(s.optional?" (optional)":""),inner,false);
     });
-    body.appendChild(doc);
+
+    // day shapes with computed totals
+    let shapes='';
+    const base=PLAN.shapes.find(x=>x.base);
+    const baseRows=base.sequence.map(sl=>{
+      const t=slotTotals(sl,0);
+      const label= sl==="pregym" ? PLAN.pregym.label : sl+" A";
+      return {label,t};
+    });
+    const baseTotal=baseRows.reduce((a,r)=>{a.p+=r.t.p;a.f+=r.t.f;a.c+=r.t.c;a.k+=r.t.k;a.fib+=r.t.fib;return a;},{p:0,f:0,c:0,k:0,fib:0});
+    shapes+='<h3>'+esc(base.name)+' — the base plan</h3><div class="tablewrap"><table class="tight"><thead><tr><th></th><th>kcal</th><th>P</th><th>F</th><th>C</th><th>Fib</th></tr></thead><tbody>';
+    baseRows.forEach(r=>{
+      shapes+='<tr><td>'+esc(r.label)+'</td><td>'+Math.round(r.t.k)+'</td><td>'+nice(round(r.t.p))+'</td><td>'+nice(round(r.t.f))+'</td><td>'+Math.round(r.t.c)+'</td><td>'+nice(round(r.t.fib))+'</td></tr>';
+    });
+    shapes+='<tr class="tot"><td><b>Total</b></td><td><b>'+Math.round(baseTotal.k)+'</b></td><td><b>'+nice(round(baseTotal.p))+'</b></td><td><b>'+nice(round(baseTotal.f))+'</b></td><td><b>'+Math.round(baseTotal.c)+'</b></td><td><b>'+nice(round(baseTotal.fib))+'</b></td></tr>'+
+      '</tbody></table></div><p class="pnote">All-A day, computed from your food DB. Rotate any meal to its B option — the roles match; Dinner B runs ~26 g protein higher for days breakfast or lunch ran low.</p>';
+    PLAN.shapes.filter(x=>!x.base).forEach(sh=>{
+      shapes+='<h3>'+esc(sh.name)+'</h3><p>'+esc(sh.adjustment?sh.adjustment.text:sh.text)+'</p>';
+      if(sh.adjustment){
+        const at=planSum(sh.adjustment.items);
+        shapes+='<p class="pnote">The add-back: '+esc(sh.adjustment.items.map(planItemLabel).join(" + "))+' → '+macLine(at,false)+'</p>';
+      }
+    });
+    html+=accSection("Three ways to run a day",shapes,false);
+
+    // no-cook fallback
+    const nc=PLAN.nocook;
+    let ncHtml='<p>'+esc(nc.text)+'</p>';
+    const ncTotal={p:0,f:0,c:0,k:0,fib:0,est:false};
+    nc.meals.forEach(m=>{
+      const t=planSum(m.items);
+      ncTotal.p+=t.p;ncTotal.f+=t.f;ncTotal.c+=t.c;ncTotal.k+=t.k;ncTotal.fib+=t.fib;if(t.est)ncTotal.est=true;
+      ncHtml+='<div class="popt"><div class="poh"><span class="potag">'+esc(m.slot)+'</span><span class="ponm">'+esc(m.name)+'</span></div>'+
+        '<div class="pomac">'+macLine(t)+'</div><ul class="poing">'+
+        m.items.map(it=>'<li'+(it.unlinked?' class="unlinked"':'')+'>'+esc(planItemLabel(it))+(it.unlinked?' <span class="est">est</span>':'')+'</li>').join("")+
+        '</ul></div>';
+    });
+    ncHtml+='<div class="pomac" style="margin-top:10px">Day total: '+macLine(ncTotal)+'</div>'+
+      '<p class="pnote">'+esc(nc.safety)+' '+esc(nc.prep)+'</p>';
+    html+=accSection(nc.name,ncHtml,false);
+
+    // quick swaps
+    let sw='';
+    PLAN.swaps.forEach(g=>{sw+='<h3>'+esc(g.group)+'</h3><p>'+esc(g.options.join(" · "))+'</p>';});
+    html+=accSection("Quick swaps (macros stay ~same)",sw,false);
+
+    doc.innerHTML=html;
+    body.innerHTML="";body.appendChild(doc);
     planRendered=true;
   }
 
@@ -890,11 +1070,13 @@
     customFoods=lsGet("pt:customfoods",[]);
     loadMeals();
     weights=lsGet("pt:weights",[]);
+    waist=lsGet("pt:waist",[]);
     taps=lsGet("pt:taps",{});
     entries=loadDay(dateKey);
     rebuildFoods();
     const dEl=$("date"); if(dEl) dEl.textContent=prettyDate();
-    renderChips("");renderFavs();render();renderWeight();renderWeek();
+    renderChips("");renderFavs();render();renderWeight();renderWaist();renderWeek();renderNudge();
+    initDurability();
   }catch(e){
     warn("init failed: "+e.message);
     const fl=$("foodlist");
