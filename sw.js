@@ -1,11 +1,12 @@
 /* Protein Tracker — service worker
    Bump CACHE version when you change app files, so the new version installs. */
-const CACHE = "protein-tracker-v7";
+const CACHE = "protein-tracker-v8";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./plan.js",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
