@@ -19,66 +19,75 @@
   const CIRC=2*Math.PI*88;
   const MEALS=["Breakfast","Lunch","Snack","Dinner"];
 
-  /* per = macros per ONE unit (g / ml / egg / white / slice / katori / piece / roti / idli / dosa / tsp) */
+  /* Food model (v2, grams-first):
+       per100  macros per 100 g (or 100 ml) — canonical
+       sv      serving presets [{l:label, g:grams, d:1 if default}]
+       ver     provenance: label | product-page | reference (custom = your label)
+       step    grams step in exact mode
+     Gram weights behind old count units: egg 50 g · white 30 g · cheese slice
+     20 g · roti 40 g · idli 40 g · dosa 80 g · bread slice 30 g · katori 150 g
+     (papaya katori 140 g) · banana 120/160/40 g by variety · apple 180 g ·
+     guava 100 g · orange 130 g · date 7 g · tsp 5 g. Chosen so per-100 values
+     match standard references and old default portions round-trip exactly. */
   const BASE_FOODS=[
     // Protein & dairy
-    {n:"TruNativ Raw Concentrate",cat:"Protein & dairy",unit:"g",def:35,step:5,hint:"1 scoop = 35 g · label: 28.1g P, 0.5g F, 2.7g C, 128 kcal",per:{p:0.8029,f:0.0143,c:0.0771,k:3.657,fib:0.0}},
-    {n:"TruNativ Pro Blend",cat:"Protein & dairy",unit:"g",def:36,step:6,hint:"1 scoop = 36 g · 26 g protein",per:{p:0.733,f:0.0594,c:0.110,k:3.908,fib:0.0}},
-    {n:"Chicken breast (cooked)",cat:"Protein & dairy",unit:"g",def:150,step:25,per:{p:0.30,f:0.036,c:0,k:1.65,fib:0.0}},
-    {n:"Fish – rohu/surmai (cooked)",cat:"Protein & dairy",unit:"g",def:150,step:25,per:{p:0.22,f:0.05,c:0,k:1.35,fib:0.0}},
-    {n:"Tuna (drained)",cat:"Protein & dairy",unit:"g",def:100,step:20,hint:"1 tin ≈ 100 g",per:{p:0.25,f:0.008,c:0,k:1.16,fib:0.0}},
-    {n:"Prawns (cooked)",cat:"Protein & dairy",unit:"g",def:100,step:25,per:{p:0.24,f:0.003,c:0.002,k:0.99,fib:0.0}},
-    {n:"Whole egg",cat:"Protein & dairy",unit:"egg",def:2,step:1,per:{p:6,f:5,c:0.5,k:72,fib:0.0}},
-    {n:"Egg white",cat:"Protein & dairy",unit:"white",def:3,step:1,per:{p:3.6,f:0.06,c:0.2,k:17,fib:0.0}},
-    {n:"Paneer",cat:"Protein & dairy",unit:"g",def:100,step:20,per:{p:0.18,f:0.20,c:0.04,k:2.65,fib:0.0}},
-    {n:"Tofu",cat:"Protein & dairy",unit:"g",def:100,step:25,per:{p:0.08,f:0.048,c:0.019,k:0.76,fib:0.009}},
-    {n:"Soya chunks (dry)",cat:"Protein & dairy",unit:"g",def:50,step:10,per:{p:0.52,f:0.005,c:0.33,k:3.45,fib:0.13}},
-    {n:"Moong sprouts (boiled)",cat:"Protein & dairy",unit:"g",def:100,step:25,hint:"no-cook: steam/soak",per:{p:0.075,f:0.005,c:0.17,k:1.00,fib:0.02}},
-    {n:"Greek yogurt / hung curd",cat:"Protein & dairy",unit:"g",def:150,step:25,per:{p:0.10,f:0.027,c:0.04,k:0.87,fib:0.0}},
-    {n:"Curd (regular)",cat:"Protein & dairy",unit:"g",def:150,step:25,per:{p:0.053,f:0.03,c:0.048,k:0.60,fib:0.0}},
-    {n:"Buttermilk / chaas",cat:"Protein & dairy",unit:"ml",def:200,step:50,hint:"no-cook",per:{p:0.01,f:0.005,c:0.025,k:0.20,fib:0.0}},
-    {n:"Cheese slice",cat:"Protein & dairy",unit:"slice",def:1,step:1,per:{p:3.5,f:4.5,c:1,k:60,fib:0.0}},
-    {n:"Milk – Nandini toned",cat:"Protein & dairy",unit:"ml",def:200,step:50,hint:"per 100 ml: 3.1 g protein",per:{p:0.031,f:0.030,c:0.048,k:0.58,fib:0.0}},
+    {n:"TruNativ Raw Concentrate",cat:"Protein & dairy",unit:"g",ver:"label",hint:"1 scoop = 35 g · label: 28.1g P, 0.5g F, 2.7g C, 128 kcal",per100:{p:80.29,f:1.43,c:7.71,k:365.7,fib:0},sv:[{l:"½ scoop",g:17.5},{l:"1 scoop",g:35,d:1},{l:"1.5 scoop",g:52.5}],step:5},
+    {n:"TruNativ Pro Blend",cat:"Protein & dairy",unit:"g",ver:"product-page",hint:"1 scoop = 36 g · 26 g protein",per100:{p:73.3,f:5.94,c:11,k:390.8,fib:0},sv:[{l:"½ scoop",g:18},{l:"1 scoop",g:36,d:1},{l:"1.5 scoop",g:54}],step:6},
+    {n:"Chicken breast (cooked)",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:30,f:3.6,c:0,k:165,fib:0},sv:[{l:"100 g",g:100},{l:"150 g",g:150,d:1},{l:"200 g",g:200}],step:25},
+    {n:"Fish – rohu/surmai (cooked)",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:22,f:5,c:0,k:135,fib:0},sv:[{l:"100 g",g:100},{l:"150 g",g:150,d:1},{l:"175 g",g:175}],step:25},
+    {n:"Tuna (drained)",cat:"Protein & dairy",unit:"g",ver:"reference",hint:"1 tin ≈ 100 g",per100:{p:25,f:0.8,c:0,k:116,fib:0},sv:[{l:"1 tin",g:100,d:1},{l:"½ tin",g:50}],step:20},
+    {n:"Prawns (cooked)",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:24,f:0.3,c:0.2,k:99,fib:0},sv:[{l:"100 g",g:100,d:1},{l:"150 g",g:150}],step:25},
+    {n:"Whole egg",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:12,f:10,c:1,k:144,fib:0},sv:[{l:"1 egg",g:50},{l:"2 eggs",g:100,d:1},{l:"3 eggs",g:150}],step:10},
+    {n:"Egg white",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:12,f:0.2,c:0.6667,k:56.6667,fib:0},sv:[{l:"1 white",g:30},{l:"3 whites",g:90,d:1},{l:"6 whites",g:180}],step:10},
+    {n:"Paneer",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:18,f:20,c:4,k:265,fib:0},sv:[{l:"50 g",g:50},{l:"100 g",g:100,d:1},{l:"150 g",g:150}],step:20},
+    {n:"Tofu",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:8,f:4.8,c:1.9,k:76,fib:0.9},sv:[{l:"100 g",g:100,d:1},{l:"150 g",g:150}],step:25},
+    {n:"Soya chunks (dry)",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:52,f:0.5,c:33,k:345,fib:13},sv:[{l:"25 g",g:25},{l:"50 g",g:50,d:1},{l:"75 g",g:75}],step:10},
+    {n:"Moong sprouts (boiled)",cat:"Protein & dairy",unit:"g",ver:"reference",hint:"no-cook: steam/soak",per100:{p:7.5,f:0.5,c:17,k:100,fib:2},sv:[{l:"100 g",g:100,d:1},{l:"150 g",g:150}],step:25},
+    {n:"Greek yogurt / hung curd",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:10,f:2.7,c:4,k:87,fib:0},sv:[{l:"100 g",g:100},{l:"150 g",g:150,d:1},{l:"200 g",g:200}],step:25},
+    {n:"Curd (regular)",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:5.3,f:3,c:4.8,k:60,fib:0},sv:[{l:"100 g",g:100},{l:"150 g",g:150,d:1}],step:25},
+    {n:"Buttermilk / chaas",cat:"Protein & dairy",unit:"ml",ver:"reference",hint:"no-cook",per100:{p:1,f:0.5,c:2.5,k:20,fib:0},sv:[{l:"1 glass",g:200,d:1}],step:50},
+    {n:"Cheese slice",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:17.5,f:22.5,c:5,k:300,fib:0},sv:[{l:"1 slice",g:20,d:1},{l:"2 slices",g:40}],step:5},
+    {n:"Milk – Nandini toned",cat:"Protein & dairy",unit:"ml",ver:"product-page",hint:"per 100 ml: 3.1 g protein",per100:{p:3.1,f:3,c:4.8,k:58,fib:0},sv:[{l:"100 ml",g:100},{l:"1 glass",g:200,d:1},{l:"250 ml",g:250}],step:50},
     // Grains & carbs
-    {n:"Alpino High-Protein Oats (Choco)",cat:"Grains & carbs",unit:"g",def:50,step:10,hint:"27 g protein / 100 g",per:{p:0.27,f:0.095,c:0.47,k:3.80,fib:0.09}},
-    {n:"Rolled oats (plain)",cat:"Grains & carbs",unit:"g",def:50,step:10,per:{p:0.13,f:0.07,c:0.66,k:3.80,fib:0.1}},
-    {n:"Muesli",cat:"Grains & carbs",unit:"g",def:40,step:10,hint:"no-cook: add milk/curd",per:{p:0.10,f:0.075,c:0.67,k:3.75,fib:0.07}},
-    {n:"Rice (cooked)",cat:"Grains & carbs",unit:"g",def:150,step:25,per:{p:0.027,f:0.003,c:0.28,k:1.30,fib:0.004}},
-    {n:"Sweet potato / shakarkandi",cat:"Grains & carbs",unit:"g",def:150,step:25,per:{p:0.016,f:0.001,c:0.20,k:0.86,fib:0.03}},
-    {n:"Chapati / roti",cat:"Grains & carbs",unit:"roti",def:2,step:1,per:{p:3,f:3,c:20,k:120,fib:2.0}},
-    {n:"Idli",cat:"Grains & carbs",unit:"idli",def:3,step:1,hint:"steam only",per:{p:1.6,f:0.2,c:8,k:40,fib:0.6}},
-    {n:"Dosa (plain)",cat:"Grains & carbs",unit:"dosa",def:1,step:1,per:{p:3,f:4,c:20,k:130,fib:1.2}},
-    {n:"Poha (cooked)",cat:"Grains & carbs",unit:"katori",def:1,step:0.5,hint:"quick cook",per:{p:3,f:5,c:34,k:200,fib:1.5}},
-    {n:"Brown bread",cat:"Grains & carbs",unit:"slice",def:2,step:1,per:{p:4,f:1,c:14,k:80,fib:1.5}},
-    {n:"Roasted chana",cat:"Grains & carbs",unit:"g",def:30,step:10,per:{p:0.20,f:0.055,c:0.53,k:3.65,fib:0.15}},
-    {n:"Dal / rajma (cooked)",cat:"Grains & carbs",unit:"katori",def:1,step:0.5,hint:"1 katori ≈ 150 g",per:{p:7,f:3,c:18,k:120,fib:5.0}},
+    {n:"Alpino High-Protein Oats (Choco)",cat:"Grains & carbs",unit:"g",ver:"product-page",hint:"27 g protein / 100 g",per100:{p:27,f:9.5,c:47,k:380,fib:9},sv:[{l:"40 g",g:40},{l:"50 g",g:50,d:1},{l:"60 g",g:60}],step:10},
+    {n:"Rolled oats (plain)",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:13,f:7,c:66,k:380,fib:10},sv:[{l:"40 g",g:40},{l:"50 g",g:50,d:1},{l:"60 g",g:60}],step:10},
+    {n:"Muesli",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"no-cook: add milk/curd",per100:{p:10,f:7.5,c:67,k:375,fib:7},sv:[{l:"40 g",g:40,d:1},{l:"60 g",g:60}],step:10},
+    {n:"Rice (cooked)",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:2.7,f:0.3,c:28,k:130,fib:0.4},sv:[{l:"100 g",g:100},{l:"150 g",g:150,d:1},{l:"200 g",g:200}],step:25},
+    {n:"Sweet potato / shakarkandi",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:1.6,f:0.1,c:20,k:86,fib:3},sv:[{l:"100 g",g:100},{l:"150 g",g:150,d:1},{l:"200 g",g:200}],step:25},
+    {n:"Chapati / roti",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:7.5,f:7.5,c:50,k:300,fib:5},sv:[{l:"1 roti",g:40},{l:"2 rotis",g:80,d:1},{l:"3 rotis",g:120}],step:10},
+    {n:"Idli",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"steam only",per100:{p:4,f:0.5,c:20,k:100,fib:1.5},sv:[{l:"2 idli",g:80},{l:"3 idli",g:120,d:1},{l:"4 idli",g:160}],step:10},
+    {n:"Dosa (plain)",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:3.75,f:5,c:25,k:162.5,fib:1.5},sv:[{l:"1 dosa",g:80,d:1},{l:"2 dosas",g:160}],step:20},
+    {n:"Poha (cooked)",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"quick cook",per100:{p:2,f:3.3333,c:22.6667,k:133.3333,fib:1},sv:[{l:"½ katori",g:75},{l:"1 katori",g:150,d:1}],step:25},
+    {n:"Brown bread",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:13.3333,f:3.3333,c:46.6667,k:266.6667,fib:5},sv:[{l:"1 slice",g:30},{l:"2 slices",g:60,d:1}],step:10},
+    {n:"Roasted chana",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:20,f:5.5,c:53,k:365,fib:15},sv:[{l:"30 g",g:30,d:1},{l:"50 g",g:50}],step:10},
+    {n:"Dal / rajma (cooked)",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"1 katori ≈ 150 g",per100:{p:4.6667,f:2,c:12,k:80,fib:3.3333},sv:[{l:"½ katori",g:75},{l:"1 katori",g:150,d:1},{l:"1.5 katori",g:225}],step:25},
     // Vegetables
-    {n:"Spinach / palak (cooked)",cat:"Vegetables",unit:"g",def:100,step:25,per:{p:0.029,f:0.004,c:0.036,k:0.23,fib:0.024}},
-    {n:"Broccoli (cooked)",cat:"Vegetables",unit:"g",def:100,step:25,per:{p:0.028,f:0.004,c:0.07,k:0.35,fib:0.033}},
-    {n:"Mixed veg sabzi (1 tsp oil)",cat:"Vegetables",unit:"katori",def:1,step:0.5,per:{p:2,f:4,c:8,k:75,fib:3.0}},
-    {n:"Sambar",cat:"Vegetables",unit:"katori",def:1,step:0.5,per:{p:4,f:2.5,c:12,k:90,fib:3.0}},
-    {n:"Kosambari (moong salad)",cat:"Vegetables",unit:"katori",def:1,step:0.5,hint:"no-cook",per:{p:5,f:2,c:12,k:90,fib:4.0}},
-    {n:"Green salad (dressed)",cat:"Vegetables",unit:"katori",def:1,step:0.5,per:{p:1,f:0.2,c:4,k:20,fib:1.5}},
+    {n:"Spinach / palak (cooked)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:2.9,f:0.4,c:3.6,k:23,fib:2.4},sv:[{l:"100 g",g:100,d:1},{l:"150 g",g:150}],step:25},
+    {n:"Broccoli (cooked)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:2.8,f:0.4,c:7,k:35,fib:3.3},sv:[{l:"100 g",g:100,d:1},{l:"150 g",g:150}],step:25},
+    {n:"Mixed veg sabzi (1 tsp oil)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:1.3333,f:2.6667,c:5.3333,k:50,fib:2},sv:[{l:"½ katori",g:75},{l:"1 katori",g:150,d:1},{l:"1.5 katori",g:225}],step:25},
+    {n:"Sambar",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:2.6667,f:1.6667,c:8,k:60,fib:2},sv:[{l:"½ katori",g:75},{l:"1 katori",g:150,d:1},{l:"1.5 katori",g:225}],step:25},
+    {n:"Kosambari (moong salad)",cat:"Vegetables",unit:"g",ver:"reference",hint:"no-cook",per100:{p:3.3333,f:1.3333,c:8,k:60,fib:2.6667},sv:[{l:"½ katori",g:75},{l:"1 katori",g:150,d:1}],step:25},
+    {n:"Green salad (dressed)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:0.6667,f:0.1333,c:2.6667,k:13.3333,fib:1},sv:[{l:"1 katori",g:150,d:1},{l:"2 katori",g:300}],step:25},
     // Fruit
-    {n:"Banana – Robusta/Cavendish",cat:"Fruit",unit:"piece",def:1,step:1,hint:"~120g edible, the common everyday banana",per:{p:1.32,f:0.36,c:27.36,k:106.8,fib:3.12}},
-    {n:"Banana – Nendran",cat:"Fruit",unit:"piece",def:1,step:1,hint:"~160g edible, larger Kerala/coastal variety",per:{p:1.76,f:0.48,c:36.48,k:142.4,fib:4.16}},
-    {n:"Banana – Yelakki (Elaichi)",cat:"Fruit",unit:"piece",def:2,step:1,hint:"~40g edible each, small — figures below are for 2",per:{p:0.44,f:0.12,c:9.12,k:35.6,fib:1.04}},
-    {n:"Apple",cat:"Fruit",unit:"piece",def:1,step:1,per:{p:0.5,f:0.3,c:25,k:95,fib:4.4}},
-    {n:"Guava",cat:"Fruit",unit:"piece",def:1,step:1,per:{p:2.6,f:1,c:14,k:68,fib:5.4}},
-    {n:"Papaya (cubes)",cat:"Fruit",unit:"katori",def:1,step:0.5,per:{p:0.7,f:0.4,c:15,k:60,fib:2.5}},
-    {n:"Orange",cat:"Fruit",unit:"piece",def:1,step:1,per:{p:1.2,f:0.2,c:15,k:62,fib:3.1}},
-    {n:"Dates",cat:"Fruit",unit:"piece",def:2,step:1,per:{p:0.2,f:0,c:5.3,k:20,fib:0.8}},
-    {n:"Coconut water",cat:"Fruit",unit:"ml",def:200,step:50,hint:"no-cook",per:{p:0.007,f:0,c:0.045,k:0.19,fib:0.0}},
+    {n:"Banana – Robusta/Cavendish",cat:"Fruit",unit:"g",ver:"reference",hint:"~120g edible, the common everyday banana",per100:{p:1.1,f:0.3,c:22.8,k:89,fib:2.6},sv:[{l:"1 banana",g:120,d:1},{l:"½ banana",g:60}],step:10},
+    {n:"Banana – Nendran",cat:"Fruit",unit:"g",ver:"reference",hint:"~160g edible, larger Kerala/coastal variety",per100:{p:1.1,f:0.3,c:22.8,k:89,fib:2.6},sv:[{l:"1 banana",g:160,d:1},{l:"½ banana",g:80}],step:10},
+    {n:"Banana – Yelakki (Elaichi)",cat:"Fruit",unit:"g",ver:"reference",hint:"~40g edible each, small — figures below are for 2",per100:{p:1.1,f:0.3,c:22.8,k:89,fib:2.6},sv:[{l:"1 small",g:40},{l:"2 small",g:80,d:1}],step:10},
+    {n:"Apple",cat:"Fruit",unit:"g",ver:"reference",per100:{p:0.2778,f:0.1667,c:13.8889,k:52.7778,fib:2.4444},sv:[{l:"1 apple",g:180,d:1},{l:"½ apple",g:90}],step:10},
+    {n:"Guava",cat:"Fruit",unit:"g",ver:"reference",per100:{p:2.6,f:1,c:14,k:68,fib:5.4},sv:[{l:"1 guava",g:100,d:1},{l:"2 guavas",g:200}],step:10},
+    {n:"Papaya (cubes)",cat:"Fruit",unit:"g",ver:"reference",per100:{p:0.5,f:0.2857,c:10.7143,k:42.8571,fib:1.7857},sv:[{l:"1 katori",g:140,d:1},{l:"2 katori",g:280}],step:20},
+    {n:"Orange",cat:"Fruit",unit:"g",ver:"reference",per100:{p:0.9231,f:0.1538,c:11.5385,k:47.6923,fib:2.3846},sv:[{l:"1 orange",g:130,d:1}],step:10},
+    {n:"Dates",cat:"Fruit",unit:"g",ver:"reference",per100:{p:2.8571,f:0,c:75.7143,k:285.7143,fib:11.4286},sv:[{l:"2 dates",g:14,d:1},{l:"4 dates",g:28}],step:7},
+    {n:"Coconut water",cat:"Fruit",unit:"ml",ver:"reference",hint:"no-cook",per100:{p:0.7,f:0,c:4.5,k:19,fib:0},sv:[{l:"1 glass",g:200,d:1}],step:50},
     // Nuts & fats
-    {n:"Almonds",cat:"Nuts & fats",unit:"g",def:10,step:5,per:{p:0.21,f:0.49,c:0.22,k:5.80,fib:0.125}},
-    {n:"Walnuts",cat:"Nuts & fats",unit:"g",def:10,step:5,per:{p:0.15,f:0.65,c:0.14,k:6.54,fib:0.067}},
-    {n:"Peanuts (roasted)",cat:"Nuts & fats",unit:"g",def:20,step:5,per:{p:0.26,f:0.49,c:0.16,k:5.67,fib:0.085}},
-    {n:"Cashews",cat:"Nuts & fats",unit:"g",def:15,step:5,per:{p:0.18,f:0.44,c:0.30,k:5.53,fib:0.033}},
-    {n:"Chia seeds",cat:"Nuts & fats",unit:"g",def:12,step:3,per:{p:0.17,f:0.31,c:0.42,k:4.86,fib:0.34}},
-    {n:"Flax seeds",cat:"Nuts & fats",unit:"g",def:10,step:5,per:{p:0.18,f:0.42,c:0.29,k:5.34,fib:0.27}},
-    {n:"Peanut butter",cat:"Nuts & fats",unit:"g",def:15,step:5,per:{p:0.25,f:0.50,c:0.20,k:5.90,fib:0.06}},
-    {n:"Coconut (fresh grated)",cat:"Nuts & fats",unit:"g",def:20,step:10,per:{p:0.03,f:0.33,c:0.15,k:3.54,fib:0.09}},
-    {n:"Ghee / oil",cat:"Nuts & fats",unit:"tsp",def:1,step:1,per:{p:0,f:5,c:0,k:45,fib:0.0}}
+    {n:"Almonds",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:21,f:49,c:22,k:580,fib:12.5},sv:[{l:"10 g (~8 nuts)",g:10,d:1},{l:"20 g",g:20}],step:5},
+    {n:"Walnuts",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:15,f:65,c:14,k:654,fib:6.7},sv:[{l:"10 g",g:10,d:1},{l:"20 g",g:20}],step:5},
+    {n:"Peanuts (roasted)",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:26,f:49,c:16,k:567,fib:8.5},sv:[{l:"20 g",g:20,d:1},{l:"30 g",g:30}],step:5},
+    {n:"Cashews",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:18,f:44,c:30,k:553,fib:3.3},sv:[{l:"15 g",g:15,d:1},{l:"30 g",g:30}],step:5},
+    {n:"Chia seeds",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:17,f:31,c:42,k:486,fib:34},sv:[{l:"1 tbsp",g:12,d:1},{l:"2 tbsp",g:24}],step:3},
+    {n:"Flax seeds",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:18,f:42,c:29,k:534,fib:27},sv:[{l:"1 tbsp",g:10,d:1},{l:"2 tbsp",g:20}],step:5},
+    {n:"Peanut butter",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:25,f:50,c:20,k:590,fib:6},sv:[{l:"1 tbsp",g:15,d:1},{l:"2 tbsp",g:30}],step:5},
+    {n:"Coconut (fresh grated)",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:3,f:33,c:15,k:354,fib:9},sv:[{l:"20 g",g:20,d:1},{l:"30 g",g:30}],step:10},
+    {n:"Ghee / oil",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:0,f:100,c:0,k:900,fib:0},sv:[{l:"1 tsp",g:5,d:1},{l:"1 tbsp",g:15}],step:5}
   ];
   const BASE_CATS=["My foods","Protein & dairy","Grains & carbs","Vegetables","Fruit","Nuts & fats"];
 
@@ -121,6 +130,37 @@
 
   function rebuildFoods(){FOODS=customFoods.map(c=>Object.assign({},c,{mine:true})).concat(BASE_FOODS);}
   function findFood(n){return FOODS.find(f=>f.n===n);}
+
+  /* ---------- food model helpers (grams-first) ---------- */
+  function perGram(f){          // macros per 1 g/ml — or per 1 unit for count-based customs
+    if(f.countBased) return f.perUnit;
+    const h=f.per100;
+    return {p:h.p/100,f:h.f/100,c:h.c/100,k:h.k/100,fib:(h.fib||0)/100};
+  }
+  function macrosFor(f,amt){
+    const g=perGram(f);
+    return {p:g.p*amt,f:g.f*amt,c:g.c*amt,k:g.k*amt,fib:(g.fib||0)*amt};
+  }
+  function defServing(f){
+    if(f.countBased) return {l:fmtAmt(f.def)+" "+f.unit,g:f.def,d:1};
+    return (f.sv||[]).find(s=>s.d)||(f.sv||[])[0]||{l:"100 "+f.unit,g:100};
+  }
+  function defAmt(f){return defServing(f).g;}
+  const VER_LABEL={label:"✓ label-verified","product-page":"from product page",reference:"reference values",custom:"your label"};
+  /* v1 custom foods stored macros per one <unit> ({per, def}). g/ml foods
+     convert exactly to per100; count-based units (piece, serving…) keep a
+     per-unit model — no gram weight exists to invent. Idempotent. */
+  function migrateCustom(c){
+    if(c.per100||c.countBased) return c;
+    const per=c.per||{};
+    if(c.unit==="g"||c.unit==="ml"){
+      return {n:c.n,cat:"My foods",unit:c.unit,ver:"custom",
+        per100:{p:(per.p||0)*100,f:(per.f||0)*100,c:(per.c||0)*100,k:(per.k||0)*100,fib:(per.fib||0)*100},
+        sv:[{l:fmtAmt(c.def)+" "+c.unit,g:c.def,d:1}],step:c.step||5};
+    }
+    return {n:c.n,cat:"My foods",unit:c.unit||"serving",ver:"custom",countBased:true,
+      perUnit:{p:per.p||0,f:per.f||0,c:per.c||0,k:per.k||0,fib:per.fib||0},def:c.def||1,step:c.step||1};
+  }
   function sumOf(list){return list.reduce((a,e)=>{a.p+=e.p||0;a.f+=e.f||0;a.c+=e.c||0;a.k+=e.k||0;a.fib+=e.fib||0;return a;},{p:0,f:0,c:0,k:0,fib:0});}
   function totals(){return sumOf(entries);}
   function guessMeal(){
@@ -170,13 +210,14 @@
       return;
     }
     box.classList.remove("done");
-    const scored=FOODS.filter(f=>f.per.p>0 && (f.per.p/f.per.k)>=0.09)
+    const scored=FOODS.filter(f=>{const g=perGram(f);return g.p>0&&g.k>0&&(g.p/g.k)>=0.09;})
       .map(f=>{
-        const need=remP/f.per.p;
-        const amt=Math.min(need,f.def*1.5);           // realistic single portion
+        const g=perGram(f), dA=defAmt(f);
+        const need=remP/g.p;
+        const amt=Math.min(need,dA*1.5);              // realistic single portion
         const rAmt=Math.max(f.step,Math.round(amt/f.step)*f.step);
-        const addP=f.per.p*rAmt, addK=f.per.k*rAmt;
-        return {f,amt:rAmt,addP,addK,partial:need>f.def*1.5,fits:addK<=remK+40,eff:f.per.k/f.per.p};
+        const addP=g.p*rAmt, addK=g.k*rAmt;
+        return {f,amt:rAmt,addP,addK,partial:need>dA*1.5,fits:addK<=remK+40,eff:g.k/g.p};
       })
       .filter(s=> s.addP >= Math.min(10, Math.max(4, remP*0.3)))   // must make a real dent
       .sort((a,b)=> (a.fits!==b.fits ? (a.fits?-1:1) : a.eff-b.eff));
@@ -210,7 +251,7 @@
   /* ---------- today's log, grouped by meal ---------- */
   function entryRow(e,removable){
     const row=document.createElement("div");row.className="row";
-    const q=e.amt!=null?(fmtAmt(e.amt)+" "+e.unit):(e.note||"");
+    const q=e.lbl||(e.amt!=null?(fmtAmt(e.amt)+" "+e.unit):(e.note||""));
     row.innerHTML='<div class="rn"><div class="rt"></div><div class="rq">'+q+'</div></div>'+
       '<div class="rm"><b>'+nice(round(e.p))+'g P</b><br>'+Math.round(e.k)+' kcal</div>'+
       (removable?'<button class="x" aria-label="Remove entry">×</button>':'');
@@ -257,7 +298,8 @@
         b.querySelector(".fn").textContent=f.n;
         b.onclick=()=>logMeal(f.meal);
       } else {
-        b.innerHTML='<div class="fn"></div><div class="fm">'+nice(f.per.p*f.def)+'g P · '+fmtAmt(f.def)+f.unit+'</div>';
+        const ds=defServing(f), dm=macrosFor(f,ds.g);
+        b.innerHTML='<div class="fn"></div><div class="fm">'+nice(round(dm.p))+'g P · '+ds.l+'</div>';
         b.querySelector(".fn").textContent=f.n;
         b.onclick=()=>openSheet(f);
       }
@@ -289,8 +331,9 @@
       const grid=document.createElement("div");grid.className="chips";
       items.forEach(f=>{
         const b=document.createElement("button");b.className="chip"+(f.mine?" mine":"");b.type="button";
-        b.innerHTML='<div class="nm"></div><div class="mac"><b>'+nice(f.per.p*f.def)+'g P</b> · '+
-          Math.round(f.per.k*f.def)+' kcal / '+fmtAmt(f.def)+f.unit+'</div>';
+        const ds=defServing(f), dm=macrosFor(f,ds.g);
+        b.innerHTML='<div class="nm"></div><div class="mac"><b>'+nice(round(dm.p))+'g P</b> · '+
+          Math.round(dm.k)+' kcal / '+ds.l+'</div>';
         b.querySelector(".nm").textContent=f.n;
         b.onclick=()=>openSheet(f);
         grid.appendChild(b);
@@ -320,12 +363,54 @@
     sheetMeal=meal;
     $("sSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.m===meal));
   }
+  let qtyMode="sv", selSv=0;   // sv = serving presets, exact = grams/ml stepper
+  function currentAmt(){
+    if(!sheetFood)return 0;
+    if(qtyMode==="sv"&&!sheetFood.countBased) return (sheetFood.sv[selSv]||defServing(sheetFood)).g;
+    return parseFloat($("sAmt").value)||0;
+  }
+  function renderQtyUI(){
+    const f=sheetFood; if(!f)return;
+    const modeSeg=$("sQMode"), presets=$("sPresets"), stepper=$("sStepper");
+    if(f.countBased){
+      if(modeSeg)modeSeg.style.display="none";
+      if(presets)presets.style.display="none";
+      stepper.style.display="";
+      $("sUnit").textContent=f.unit;
+    } else {
+      if(modeSeg){
+        modeSeg.style.display="grid";
+        modeSeg.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.q===qtyMode));
+      }
+      $("sUnit").textContent=f.unit;
+      if(presets){
+        presets.style.display = qtyMode==="sv" ? "grid" : "none";
+        presets.innerHTML="";
+        f.sv.forEach((s,i)=>{
+          const b=document.createElement("button");b.type="button";
+          b.className="svbtn"+(i===selSv?" on":"");
+          b.innerHTML='<span class="svl"></span><span class="svg">'+fmtAmt(s.g)+' '+f.unit+'</span>';
+          b.querySelector(".svl").textContent=s.l;
+          b.onclick=()=>{selSv=i;renderQtyUI();updateSheetMacros();};
+          presets.appendChild(b);
+        });
+      }
+      stepper.style.display = qtyMode==="exact" ? "" : "none";
+    }
+  }
   function openSheet(f,amt,mode){
     sheetFood=f; sheetMode=mode||"log";
     $("sTitle").textContent=f.n;
     $("sHint").textContent=f.hint||"";
-    $("sUnit").textContent=f.unit;
-    $("sAmt").value=fmtAmt(amt!=null?amt:f.def);
+    const prov=$("sProv");
+    if(prov){prov.textContent=VER_LABEL[f.ver]||"";prov.className="prov"+(f.ver==="label"?" strong":"");}
+    // presets by default; a passed-in amount (recommender) opens exact at that value
+    if(f.countBased){qtyMode="exact";$("sAmt").value=fmtAmt(amt!=null?amt:f.def);}
+    else if(amt!=null){qtyMode="exact";$("sAmt").value=fmtAmt(amt);}
+    else{
+      qtyMode="sv";selSv=Math.max(0,f.sv.findIndex(s=>s.d));
+      $("sAmt").value=fmtAmt(defAmt(f));
+    }
     $("delFood").style.display=(f.mine&&sheetMode==="log")?"block":"none";
     const segEl=$("sSeg"); if(segEl) segEl.style.display = sheetMode==="meal" ? "none" : "grid";
     $("sAdd").textContent = sheetMode==="meal" ? "Add to meal" : "Add to today";
@@ -333,16 +418,17 @@
     $("sheet").classList.toggle("stacked", sheetMode==="meal");
     $("sheetBack").classList.toggle("stacked", sheetMode==="meal");
     setSeg(guessMeal());
+    renderQtyUI();
     updateSheetMacros();
     showSheet("sheet","sheetBack");
   }
   function closeSheet(){hideSheet("sheet","sheetBack");sheetFood=null;}
   function updateSheetMacros(){
     if(!sheetFood)return;
-    const a=parseFloat($("sAmt").value)||0, per=sheetFood.per;
-    $("sMacros").innerHTML='<span class="pm">'+nice(per.p*a)+'g P</span><span>'+Math.round(per.k*a)+
-      ' kcal</span><span>F '+nice(per.f*a)+'</span><span>C '+nice(per.c*a)+'</span>'+
-      ((per.fib||0)>0?'<span>Fib '+nice(per.fib*a)+'</span>':'');
+    const m=macrosFor(sheetFood,currentAmt());
+    $("sMacros").innerHTML='<span class="pm">'+nice(m.p)+'g P</span><span>'+Math.round(m.k)+
+      ' kcal</span><span>F '+nice(m.f)+'</span><span>C '+nice(m.c)+'</span>'+
+      (m.fib>0?'<span>Fib '+nice(m.fib)+'</span>':'');
   }
   function stepSheet(dir){
     if(!sheetFood)return;
@@ -350,6 +436,12 @@
     a=Math.max(0,Math.round((a+dir*sheetFood.step)*100)/100);
     $("sAmt").value=fmtAmt(a);updateSheetMacros();
   }
+  bind("sQMode","click",e=>{
+    const b=e.target.closest("button"); if(!b||!sheetFood||sheetFood.countBased)return;
+    if(b.dataset.q==="exact") $("sAmt").value=fmtAmt(currentAmt());   // carry the preset over
+    qtyMode=b.dataset.q;
+    renderQtyUI();updateSheetMacros();
+  });
   $("sMinus").onclick=()=>stepSheet(-1);
   $("sPlus").onclick=()=>stepSheet(1);
   $("sAmt").oninput=updateSheetMacros;
@@ -359,21 +451,27 @@
   $("sSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>setSeg(b.dataset.m));
   $("sAdd").onclick=()=>{
     if(!sheetFood)return;
-    const a=parseFloat($("sAmt").value)||0;
+    const a=currentAmt();
     if(a<=0){toast("Set an amount above 0");return;}
-    const per=sheetFood.per, fname=sheetFood.n, funit=sheetFood.unit;
+    const m=macrosFor(sheetFood,a), fname=sheetFood.n, funit=sheetFood.unit;
+    // human label when a preset was used and it says more than the raw amount
+    let lbl=null;
+    if(qtyMode==="sv"&&!sheetFood.countBased){
+      const s=sheetFood.sv[selSv];
+      if(s&&!/^[\d.½]+ ?(g|ml)/.test(s.l)) lbl=s.l+" · "+fmtAmt(a)+" "+funit;
+    }
     if(sheetMode==="meal"){
       if(!draft){closeSheet();return;}
-      draft.items.push({n:fname,amt:a,unit:funit,
-        p:per.p*a,f:per.f*a,c:per.c*a,k:per.k*a,fib:(per.fib||0)*a});
+      draft.items.push({n:fname,amt:a,unit:funit,lbl:lbl,
+        p:m.p,f:m.f,c:m.c,k:m.k,fib:m.fib});
       renderDraft();closeSheet();   // note: closeSheet() nulls sheetFood, so read it before here
       const se=$("mbSearch"); if(se){se.value="";renderPicker("");}
       toast(fname+" added to the meal");
       return;
     }
-    addEntry({n:sheetFood.n,amt:a,unit:sheetFood.unit,meal:sheetMeal,p:per.p*a,f:per.f*a,c:per.c*a,k:per.k*a,fib:(per.fib||0)*a});
-    taps[sheetFood.n]=(taps[sheetFood.n]||0)+1; saveTaps(); renderFavs();
-    toast("+"+nice(round(per.p*a))+" g protein · "+sheetMeal);
+    addEntry({n:fname,amt:a,unit:funit,lbl:lbl,meal:sheetMeal,p:m.p,f:m.f,c:m.c,k:m.k,fib:m.fib});
+    taps[fname]=(taps[fname]||0)+1; saveTaps(); renderFavs();
+    toast("+"+nice(round(m.p))+" g protein · "+sheetMeal);
     closeSheet();
   };
   $("delFood").onclick=()=>{
@@ -433,8 +531,8 @@
     if(amt<=0){toast("Enter the amount those macros are for");return;}
     if(!p&&!k){toast("Enter at least protein or calories");return;}
     if(FOODS.some(x=>x.n.toLowerCase()===name.toLowerCase())){toast("A food with that name exists");return;}
-    customFoods.push({n:name,cat:"My foods",unit:unit,def:amt,step:(amt>=20?5:(amt>=5?1:0.5)),
-      per:{p:p/amt,f:f/amt,c:c/amt,k:k/amt,fib:fib/amt}});
+    customFoods.push(migrateCustom({n:name,cat:"My foods",unit:unit,def:amt,step:(amt>=20?5:(amt>=5?1:0.5)),
+      per:{p:p/amt,f:f/amt,c:c/amt,k:k/amt,fib:fib/amt}}));
     saveCustom();rebuildFoods();
     ["cfName","cfUnit","cfAmt","cfP","cfK","cfF","cfC","cfFib"].forEach(i=>{const el=$(i);if(el)el.value="";});
     document.querySelector(".addfood").open=false;
@@ -787,7 +885,7 @@
   function loadMeals(){meals=lsGet("pt:meals",[]);}
   function saveMeals(){lsSet("pt:meals",meals);}
   function mealTotals(m){return sumOf(m.items||[]);}
-  function ingLine(m){return (m.items||[]).map(i=>i.n+" "+fmtAmt(i.amt)+i.unit).join(" · ");}
+  function ingLine(m){return (m.items||[]).map(i=>i.n+" "+(i.lbl||fmtAmt(i.amt)+i.unit)).join(" · ");}
 
   function renderMeals(){
     const wrap=$("mealList"); if(!wrap)return;
@@ -853,7 +951,7 @@
     } else {
       draft.items.forEach((it,idx)=>{
         const r=document.createElement("div");r.className="mbrow";
-        r.innerHTML='<span class="mbn"></span><span class="mba">'+fmtAmt(it.amt)+' '+it.unit+' · '+nice(round(it.p))+'g P</span>'+
+        r.innerHTML='<span class="mbn"></span><span class="mba">'+(it.lbl||fmtAmt(it.amt)+' '+it.unit)+' · '+nice(round(it.p))+'g P</span>'+
           '<button class="mbx" aria-label="Remove">×</button>';
         r.querySelector(".mbn").textContent=it.n;
         r.querySelector(".mbx").onclick=()=>{draft.items.splice(idx,1);renderDraft();};
@@ -871,7 +969,8 @@
     if(!filter){wrap.innerHTML='';return;}
     FOODS.filter(f=>f.n.toLowerCase().includes(filter)).slice(0,12).forEach(f=>{
       const b=document.createElement("button");b.className="chip";b.type="button";
-      b.innerHTML='<div class="nm"></div><div class="mac"><b>'+nice(f.per.p*f.def)+'g P</b> / '+fmtAmt(f.def)+f.unit+'</div>';
+      const ds=defServing(f), dm=macrosFor(f,ds.g);
+      b.innerHTML='<div class="nm"></div><div class="mac"><b>'+nice(round(dm.p))+'g P</b> / '+ds.l+'</div>';
       b.querySelector(".nm").textContent=f.n;
       b.onclick=()=>openSheet(f,null,"meal");
       wrap.appendChild(b);
@@ -918,7 +1017,7 @@
     if(it.est) return it.est;
     const f=findFood(it.food);
     if(!f){warn("plan item not in food DB: "+it.food);return null;}
-    return {p:f.per.p*it.amt,f:f.per.f*it.amt,c:f.per.c*it.amt,k:f.per.k*it.amt,fib:(f.per.fib||0)*it.amt};
+    return macrosFor(f,it.amt);          // plan amounts are grams/ml
   }
   function planSum(items){
     const t={p:0,f:0,c:0,k:0,fib:0,est:false};
@@ -932,11 +1031,7 @@
   function planItemLabel(it){
     if(!it.food) return it.name;
     const f=findFood(it.food);
-    const unit=f?f.unit:"";
-    let s;
-    if(unit==="g"||unit==="ml") s=fmtAmt(it.amt)+" "+unit+" "+it.food;
-    else if(unit==="katori"||unit==="tsp") s=it.food+" — "+fmtAmt(it.amt)+" "+unit;
-    else s=it.food+" × "+fmtAmt(it.amt);
+    let s=fmtAmt(it.amt)+" "+(f?f.unit:"g")+" "+it.food;
     if(it.note)s+=" ("+it.note+")";
     return s;
   }
@@ -1067,7 +1162,9 @@
 
   try{
     targets=Object.assign({},DEFAULT_TARGETS,lsGet("pt:targets",{}));
-    customFoods=lsGet("pt:customfoods",[]);
+    const rawCustom=lsGet("pt:customfoods",[]);
+    customFoods=rawCustom.map(migrateCustom);
+    if(JSON.stringify(customFoods)!==JSON.stringify(rawCustom)) saveCustom();  // persist v1→v2 migration once
     loadMeals();
     weights=lsGet("pt:weights",[]);
     waist=lsGet("pt:waist",[]);

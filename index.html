@@ -167,7 +167,13 @@
   <div class="grab" aria-hidden="true"></div>
   <div class="sheet-title" id="sTitle">Food</div>
   <div class="sheet-hint" id="sHint"></div>
-  <div class="stepper">
+  <div class="prov" id="sProv"></div>
+  <div class="seg two" id="sQMode" role="group" aria-label="Amount mode">
+    <button data-q="sv">Servings</button>
+    <button data-q="exact">Exact</button>
+  </div>
+  <div class="svgrid" id="sPresets"></div>
+  <div class="stepper" id="sStepper">
     <button id="sMinus" aria-label="Decrease amount">−</button>
     <div class="amtbox"><input id="sAmt" inputmode="decimal" aria-label="Amount"><span class="u" id="sUnit">g</span></div>
     <button id="sPlus" aria-label="Increase amount">+</button>
