@@ -273,7 +273,8 @@
   /* ---------- today's log, grouped by meal ---------- */
   function entryRow(e,removable){
     const row=document.createElement("div");row.className="row";
-    const q=e.lbl||(e.amt!=null?(fmtAmt(e.amt)+" "+e.unit):(e.note||""));
+    // q can carry user-typed strings (custom-food units, meal ingredient notes) — escape it
+    const q=esc(e.lbl||(e.amt!=null?(fmtAmt(e.amt)+" "+e.unit):(e.note||"")));
     row.innerHTML='<div class="rn"><div class="rt"></div><div class="rq">'+q+'</div></div>'+
       '<div class="rm"><b>'+nice(round(e.p))+'g P</b><br>'+Math.round(e.k)+' kcal</div>'+
       (removable?'<button class="x" aria-label="Remove entry">×</button>':'');
@@ -1042,7 +1043,7 @@
     } else {
       draft.items.forEach((it,idx)=>{
         const r=document.createElement("div");r.className="mbrow";
-        r.innerHTML='<span class="mbn"></span><span class="mba">'+(it.lbl||fmtAmt(it.amt)+' '+it.unit)+' · '+nice(round(it.p))+'g P</span>'+
+        r.innerHTML='<span class="mbn"></span><span class="mba">'+esc(it.lbl||fmtAmt(it.amt)+' '+it.unit)+' · '+nice(round(it.p))+'g P</span>'+
           '<button class="mbx" aria-label="Remove">×</button>';
         r.querySelector(".mbn").textContent=it.n;
         r.querySelector(".mbx").onclick=()=>{draft.items.splice(idx,1);renderDraft();};
