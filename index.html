@@ -236,6 +236,24 @@
     <input type="file" id="impFile" accept="application/json,.json" style="display:none">
     <div class="setnote">The JSON export is the interface to your coaching review — full history every time: logs, weights, waist, foods, meals, targets. It's also your only backup: clearing this site's browser data wipes the app.</div>
 
+    <div class="sec-h">Sync</div>
+    <div class="ct" id="syncLine">Off — data lives only on this device.</div>
+    <div class="cichips tokbox" id="syncTokenBox" style="display:none"></div>
+    <div class="setrow" id="syncOffRow">
+      <button id="syncEnable">Enable sync</button>
+      <button id="syncUse">Use existing token</button>
+    </div>
+    <div class="setrow" id="syncTokenEntry" style="display:none">
+      <input id="syncTokenIn" class="tokin" placeholder="Paste token from your other device" autocomplete="off" spellcheck="false" autocapitalize="off">
+      <button id="syncConnect">Connect</button>
+    </div>
+    <div class="setrow" id="syncOnRow" style="display:none">
+      <button id="syncNow">Sync now</button>
+      <button id="syncShow">Show token</button>
+      <button id="syncOff">Turn off</button>
+    </div>
+    <div class="setnote">Sync keeps this device and your other one on the same data through a private token — no account. Needs the KV store set up once on Vercel (docs/SYNC.md).</div>
+
     <div class="sec-h">Storage</div>
     <div class="setnote" id="storageLine" style="margin-top:6px">—</div>
 
@@ -298,6 +316,7 @@
 
 <script src="./plan.js"></script>
 <script src="./recommend.js"></script>
+<script src="./sync.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>
