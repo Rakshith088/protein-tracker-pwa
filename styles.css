@@ -109,37 +109,30 @@ h1,h2,h3{margin:0}
 .iconbtn:active{transform:scale(.92);background:var(--surface-2)}
 .iconbtn svg{width:17px;height:17px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
 
-/* ---------- hero ring ---------- */
-.hero{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:22px 20px 20px;margin-top:12px;
-  display:flex;flex-direction:column;align-items:center;position:relative;overflow:hidden}
-.ringwrap{position:relative;width:212px;height:212px;max-width:100%;touch-action:none}
-svg.ring{width:212px;height:212px;transform:rotate(-90deg)}
-.ring .track{fill:none;stroke:var(--track);stroke-width:15}
-.ring .prog{fill:none;stroke:var(--graphic);stroke-width:15;stroke-linecap:round;
+/* ---------- hero: the day at a glance (ring + 4 macro meters) ---------- */
+.hero{background:var(--surface);border:1px solid var(--line);border-radius:22px;padding:18px 16px;margin-top:12px;
+  display:flex;gap:18px;align-items:center;position:relative;overflow:hidden}
+.ringwrap{position:relative;width:140px;height:140px;max-width:100%;flex:none}
+svg.ring{width:140px;height:140px;transform:rotate(-90deg)}
+.ring .track{fill:none;stroke:var(--track);stroke-width:10}
+.ring .prog{fill:none;stroke:var(--graphic);stroke-width:10;stroke-linecap:round;
   transition:stroke-dashoffset .6s var(--spring),stroke .4s ease}
 .center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
-.pnum{font-family:var(--mono);font-size:58px;font-weight:600;line-height:.92;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
-.ptarget{font-family:var(--mono);font-size:15px;color:var(--muted);margin-top:5px;font-variant-numeric:tabular-nums}
-.plabel{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-text);font-weight:700;margin-top:8px}
-.remain{font-size:13px;color:var(--muted);margin-top:14px;min-height:18px}
-.remain b{color:var(--text);font-family:var(--mono);font-variant-numeric:tabular-nums}
+.pnum{font-family:var(--mono);font-size:34px;font-weight:600;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+.ptarget{font-family:var(--mono);font-size:11.5px;color:var(--muted);margin-top:3px;font-variant-numeric:tabular-nums}
+.plabel{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent-text);font-weight:700;margin-top:5px}
 /* target hit: ring reads as the celebration; text uses accent-text (never lime) */
 .hit .pnum{color:var(--accent-text)}
-.badge{opacity:0;transform:translateY(4px);transition:.35s var(--ease);font-weight:700;
-  color:var(--accent-text);font-size:13px;margin-top:14px}
-.hit .badge{opacity:1;transform:none} .hit .remain{display:none}
-
-/* ---------- secondary stats ---------- */
-.subs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0 4px}
-.stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:11px 12px;min-width:0}
-.stat .k{font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);font-weight:600}
-.stat .v{font-family:var(--mono);font-size:19px;font-weight:600;margin-top:3px;font-variant-numeric:tabular-nums;
-  white-space:nowrap;display:flex;align-items:baseline;gap:4px}
-.stat .of{font-size:11px;color:var(--muted);font-weight:400}
-.cal{grid-column:1/-1}
-.bar{height:6px;background:var(--track);border-radius:4px;margin-top:9px;overflow:hidden}
-.bar>i{display:block;height:100%;background:var(--text);border-radius:4px;transition:width .5s var(--spring)}
-.cal.over .v{color:var(--danger)} .cal.over .bar>i{background:var(--danger)}
+.hside{flex:1;min-width:0;display:flex;flex-direction:column;gap:11px}
+.hrow{min-width:0}
+.hrow .r1{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.hrow .k{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.hrow .v{font-family:var(--mono);font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hrow .of{color:var(--muted);font-weight:400;font-size:11px}
+.hrow .bar{height:4px;background:var(--track);border-radius:3px;margin-top:5px;overflow:hidden}
+.hrow .bar i{display:block;height:100%;background:var(--text);border-radius:3px;transition:width .5s var(--spring)}
+.hrow.over .v{color:var(--danger)} .hrow.over .of{color:var(--danger)} .hrow.over .bar i{background:var(--danger)}
+.hrow.met .v{color:var(--accent-text)} .hrow.met .bar i{background:var(--graphic)}
 
 /* ---------- recommender ---------- */
 .rec{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:15px 15px 13px;margin-top:12px}
@@ -198,14 +191,19 @@ svg.ring{width:212px;height:212px;transform:rotate(-90deg)}
 .accbody{padding:10px}
 
 .chips{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.chip{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:11px 12px;text-align:left;
-  cursor:pointer;min-height:var(--tap);min-width:0;color:var(--text);position:relative;
-  transition:transform .09s var(--ease),border-color .15s,background .15s}
-.chip:active{transform:scale(.965);border-color:var(--accent-surface)}
-.chip .nm{font-size:13px;font-weight:600;line-height:1.25;padding-right:4px}
+.chip{display:flex;align-items:stretch;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;
+  min-width:0;position:relative;overflow:hidden;transition:border-color .15s}
+.chip .cmain{flex:1;min-width:0;border:none;background:none;text-align:left;cursor:pointer;color:var(--text);
+  padding:11px 6px 11px 12px;min-height:var(--tap);font-family:inherit;transition:background .12s}
+.chip .cmain:active{background:var(--track)}
+.chip .nm{font-size:13px;font-weight:600;line-height:1.25;padding-right:2px}
 .chip .mac{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:5px;font-variant-numeric:tabular-nums}
 .chip .mac b{color:var(--accent-text);font-weight:600}
-.chip.mine::after{content:"";position:absolute;top:9px;right:9px;width:6px;height:6px;border-radius:50%;background:var(--accent-surface)}
+.chip .cadd{flex:none;width:40px;border:none;border-left:1px solid var(--line);background:transparent;
+  color:var(--accent-text);font-size:21px;font-weight:700;cursor:pointer;line-height:1;
+  transition:background .12s,color .12s}
+.chip .cadd:active{background:var(--accent-surface);color:var(--accent-on)}
+.chip.mine::after{content:"";position:absolute;top:9px;right:47px;width:6px;height:6px;border-radius:50%;background:var(--accent-surface)}
 
 /* ---------- add custom food ---------- */
 .addfood{margin-top:6px;background:var(--surface);border:1px dashed var(--line);border-radius:13px;overflow:hidden}
@@ -377,8 +375,9 @@ svg.ring{width:212px;height:212px;transform:rotate(-90deg)}
 }
 /* very narrow phones */
 @media (max-width:360px){
-  .pnum{font-size:50px}
-  .ringwrap,svg.ring{width:186px;height:186px}
+  .pnum{font-size:30px}
+  .ringwrap,svg.ring{width:124px;height:124px}
+  .hero{gap:14px;padding:16px 13px}
   .seg button{font-size:10.5px}
 }
 
@@ -413,8 +412,6 @@ body{padding-bottom:calc(88px + env(safe-area-inset-bottom))}   /* room for the 
 .tab.on{color:var(--accent-text)}
 .tab.on svg{stroke-width:2.1}
 
-/* fibre stat: quiet tick when the day's target is met */
-.stat#fibbox.met .v{color:var(--accent-text)}
 
 /* view headers */
 .viewhead{margin:16px 4px 14px}
@@ -558,3 +555,14 @@ body{padding-bottom:calc(88px + env(safe-area-inset-bottom))}   /* room for the 
 .recmeal .rlog{margin-top:11px;width:100%;min-height:44px;border:none;border-radius:11px;
   background:var(--accent-surface);color:var(--accent-on);font-size:13.5px;font-weight:700;cursor:pointer}
 .recmeal .rlog:active{transform:scale(.98)}
+
+/* v2: coach check-in (settings) */
+.ct{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:8px}
+.cichips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.cichips span{background:var(--surface-2);border-radius:8px;padding:5px 9px;font-variant-numeric:tabular-nums}
+.cichips b{color:var(--accent-text);font-weight:700}
+.cichips:empty{display:none}
+.coachbtn{width:100%;min-height:48px;margin-top:12px;border:none;border-radius:12px;
+  background:var(--accent-surface);color:var(--accent-on);font-weight:700;font-size:14px;cursor:pointer;
+  transition:transform .09s var(--ease),background .15s}
+.coachbtn:active{transform:scale(.98);background:var(--accent-press)}

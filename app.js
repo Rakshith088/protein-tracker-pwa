@@ -16,7 +16,7 @@
      Settings. pt:targets is externally derived and drifts — no logic or copy
      anywhere may assume these specific values. */
   const DEFAULT_TARGETS={p:160,k:1975,f:58,c:200,fib:30};
-  const CIRC=2*Math.PI*88;
+  const CIRC=2*Math.PI*59;   /* matches r=59 in the 140px hero ring */
   const MEALS=["Breakfast","Lunch","Snack","Dinner"];
 
   /* Food model (v2, grams-first):
@@ -111,7 +111,7 @@
   function warn(msg){ try{console.warn("[tracker] "+msg);}catch(e){} }
   const prog=$("prog"); prog.style.strokeDasharray=CIRC;
 
-  let entries=[], customFoods=[], FOODS=[], targets={}, weights=[], waist=[], taps={};
+  let entries=[], customFoods=[], FOODS=[], targets={}, weights=[], waist=[], taps={}, targetlog=[];
   let sheetFood=null, sheetMeal=null, sheetMode="log", histDate=null;
   const dateKey=todayKey();
 
@@ -185,26 +185,31 @@
   }
 
   /* ---------- main render ---------- */
+  /* hero shows whole grams — at a glance "149 of 160" is the information;
+     decimals live in the log rows and the scrolled-appbar readout */
+  function heroRow(id,val,target,barId,opts){
+    opts=opts||{};
+    const box=$(id); if(!box)return;
+    const v=box.querySelector("#"+opts.valId);
+    if(v)v.textContent=opts.oneDp?nice(round(val)):String(Math.round(val));
+    const of=box.querySelector(".of");
+    if(of)of.textContent="/ "+target+(opts.unitless?"":" g");
+    const bar=$(barId);
+    if(bar)bar.style.width=(Math.min(val/(target||1),1)*100)+"%";
+    if(opts.overAt!=null)box.classList.toggle("over",val>opts.overAt);
+    if(opts.metAt!=null)box.classList.toggle("met",val>=opts.metAt);
+  }
   function render(){
     const t=totals(), p=round(t.p);
-    $("pnum").textContent=nice(p);
+    $("pnum").textContent=String(Math.round(p));
     $("ptarget").textContent="/ "+targets.p+" g";
     prog.style.strokeDashoffset=CIRC*(1-Math.min(p/targets.p,1));
-    const rem=round(targets.p-p);
-    $("remain").innerHTML = rem>0 ? "<b>"+nice(rem)+" g</b> to go" : "<b>+"+nice(-rem)+" g</b> over target";
     $("hero").classList.toggle("hit",p>=targets.p);
     $("miniP").innerHTML="<b>"+nice(p)+"</b>/"+targets.p+" g";
-    $("cal").textContent=Math.round(t.k);
-    $("calof").textContent="/ "+targets.k+" kcal";
-    $("calbar").style.width=(Math.min(t.k/targets.k,1)*100)+"%";
-    $("calbox").classList.toggle("over",t.k>targets.k+40);
-    $("fat").innerHTML=nice(round(t.f))+'<span class="of">/'+targets.f+'g</span>';
-    $("carb").innerHTML=Math.round(t.c)+'<span class="of">/'+targets.c+'g</span>';
-    const fibEl=$("fib");
-    if(fibEl){
-      fibEl.innerHTML=nice(round(t.fib))+'<span class="of">/'+targets.fib+'g</span>';
-      const fbox=$("fibbox"); if(fbox) fbox.classList.toggle("met", t.fib>=targets.fib);
-    }
+    heroRow("calbox",t.k,targets.k,"calbar",{valId:"cal",unitless:true,overAt:targets.k+40});
+    heroRow("fatbox",t.f,targets.f,"fatbar",{valId:"fat",overAt:targets.f+5});
+    heroRow("carbbox",t.c,targets.c,"carbbar",{valId:"carb"});
+    heroRow("fibbox",t.fib,targets.fib,"fibbar",{valId:"fib",oneDp:true,metAt:targets.fib});
     $("footTargets").textContent="Targets: "+targets.p+" g protein · "+targets.k+" kcal · fat "+targets.f+" g · carbs "+targets.c+" g · fibre "+targets.fib+" g";
     renderRecommender();
     renderLog();
@@ -344,13 +349,15 @@
       const body=document.createElement("div");body.className="accbody";
       const grid=document.createElement("div");grid.className="chips";
       items.forEach(f=>{
-        const b=document.createElement("button");b.className="chip"+(f.mine?" mine":"");b.type="button";
+        const wrap=document.createElement("div");wrap.className="chip"+(f.mine?" mine":"");
         const ds=defServing(f), dm=macrosFor(f,ds.g);
-        b.innerHTML='<div class="nm"></div><div class="mac"><b>'+nice(round(dm.p))+'g P</b> · '+
-          Math.round(dm.k)+' kcal / '+ds.l+'</div>';
-        b.querySelector(".nm").textContent=f.n;
-        b.onclick=()=>openSheet(f);
-        grid.appendChild(b);
+        wrap.innerHTML='<button class="cmain" type="button"><div class="nm"></div>'+
+          '<div class="mac"><b>'+nice(round(dm.p))+'g P</b> · '+Math.round(dm.k)+' kcal / '+ds.l+'</div></button>'+
+          '<button class="cadd" type="button" aria-label="Log '+esc(ds.l)+' of '+esc(f.n)+' now">+</button>';
+        wrap.querySelector(".nm").textContent=f.n;
+        wrap.querySelector(".cmain").onclick=()=>openSheet(f);
+        wrap.querySelector(".cadd").onclick=()=>quickAdd(f);
+        grid.appendChild(wrap);
       });
       body.appendChild(grid);acc.appendChild(body);
       // remember which sections you keep open (only when not searching)
@@ -361,6 +368,18 @@
       wrap.appendChild(acc);
     });
     if(!matches) wrap.innerHTML='<div class="empty">No foods match \u201c'+filter+'\u201d. Add it below to save it permanently.</div>';
+  }
+
+  /* ---------- one-tap quick add: default serving, undo via the log row × ---------- */
+  function quickAdd(f){
+    const ds=defServing(f), amt=ds.g, m=macrosFor(f,amt);
+    let lbl=null;
+    if(!f.countBased && !/^[\d.½]+ ?(g|ml)/.test(ds.l))
+      lbl = /\(\d+(\.\d+)? ?(g|ml)\)/.test(ds.l) ? ds.l : ds.l+" · "+fmtAmt(amt)+" "+f.unit;
+    const meal=guessMeal();
+    addEntry({n:f.n,amt:amt,unit:f.unit,lbl:lbl,meal:meal,p:m.p,f:m.f,c:m.c,k:m.k,fib:m.fib});
+    taps[f.n]=(taps[f.n]||0)+1;saveTaps();renderFavs();
+    toast("+"+nice(round(m.p))+" g protein · "+ds.l+" · "+meal);
   }
 
   /* ---------- generic sheet open/close ---------- */
@@ -690,10 +709,36 @@
     });
   }
 
-  /* ---------- settings ---------- */
+  /* ---------- settings + coach check-in ---------- */
+  /* pt:targetlog: [{d: ISO, targets:{p,k,f,c,fib}}] — appended on every coach
+     update and carried in the export, so the coach sees when changes took effect */
+  function saveTargetlog(){lsSet("pt:targetlog",targetlog);}
+  function deltaChipsHtml(oldT,newT){
+    const KEYS=[["k","kcal"],["p","P"],["f","F"],["c","C"],["fib","Fib"]];
+    return KEYS.map(([key,lbl])=>{
+      const o=oldT[key],n=newT[key];
+      return '<span>'+lbl+' '+o+(o===n?' =':' → <b>'+n+'</b>')+'</span>';
+    }).join("");
+  }
+  function renderCoachLine(){
+    const line=$("coachLine"),chips=$("coachChips");
+    if(!line)return;
+    const bits=[];
+    if(targetlog.length){
+      const d=daysBetween(targetlog[targetlog.length-1].d);
+      bits.push("Targets last updated "+(d===0?"today":d+" day"+(d===1?"":"s")+" ago"));
+    } else bits.push("No coach update recorded yet");
+    const le=lsGet("pt:lastexport",null);
+    if(le){const d=daysBetween(le);bits.push("export sent "+(d===0?"today":d+" day"+(d===1?"":"s")+" ago"));}
+    line.textContent=bits.join(" · ");
+    if(chips){
+      chips.innerHTML="";
+      if(targetlog.length>=2)
+        chips.innerHTML=deltaChipsHtml(targetlog[targetlog.length-2].targets,targetlog[targetlog.length-1].targets);
+    }
+  }
   function openSettings(){
-    $("tP").value=targets.p;$("tK").value=targets.k;$("tF").value=targets.f;$("tC").value=targets.c;
-    const tf=$("tFib"); if(tf) tf.value=targets.fib;
+    renderCoachLine();
     const days=allLogKeys().length;
     $("statLine").textContent=days+" day"+(days===1?"":"s")+" logged · "+customFoods.length+" custom food"+(customFoods.length===1?"":"s")+" · "+meals.length+" meal"+(meals.length===1?"":"s")+" · "+weights.length+" weigh-in"+(weights.length===1?"":"s")+" · "+waist.length+" waist";
     const sl=$("storageLine"); if(sl) sl.textContent=storageLineText();
@@ -704,15 +749,42 @@
   $("btnSet").onclick=openSettings;
   $("setCancel").onclick=closeSettings;
   $("setBack").onclick=closeSettings;
-  $("setSave").onclick=()=>{
-    const p=parseFloat($("tP").value),k=parseFloat($("tK").value),f=parseFloat($("tF").value),c=parseFloat($("tC").value);
-    if(!(p>0&&k>0)){toast("Protein and calories must be above 0");return;}
-    if(p>400||k>8000){toast("That looks out of range — check the numbers");return;}
-    const fibv=parseFloat(($("tFib")||{}).value);
-    targets={p:Math.round(p),k:Math.round(k),f:Math.round(f)||0,c:Math.round(c)||0,
-             fib:Math.round(fibv)||DEFAULT_TARGETS.fib};
-    saveTargets();planRendered=false;render();renderWeek();closeSettings();toast("Targets updated");
-  };
+
+  function readCoachInputs(){
+    return {p:parseFloat($("tP").value),k:parseFloat($("tK").value),
+            f:parseFloat($("tF").value),c:parseFloat($("tC").value),
+            fib:parseFloat(($("tFib")||{}).value)};
+  }
+  function renderDeltaChips(){
+    const el=$("deltaChips"); if(!el)return;
+    const v=readCoachInputs();
+    const nt={p:Math.round(v.p)||0,k:Math.round(v.k)||0,f:Math.round(v.f)||0,c:Math.round(v.c)||0,fib:Math.round(v.fib)||0};
+    el.innerHTML=deltaChipsHtml(targets,nt);
+  }
+  function openCoach(){
+    $("tP").value=targets.p;$("tK").value=targets.k;$("tF").value=targets.f;$("tC").value=targets.c;
+    const tf=$("tFib"); if(tf) tf.value=targets.fib;
+    renderDeltaChips();
+    showSheet("coachSheet","coachBack");
+  }
+  function closeCoach(){hideSheet("coachSheet","coachBack");}
+  makeDraggable("coachSheet",closeCoach);
+  bind("coachBtn","click",openCoach);
+  bind("coachCancel","click",closeCoach);
+  bind("coachBack","click",closeCoach);
+  ["tP","tK","tF","tC","tFib"].forEach(id=>bind(id,"input",renderDeltaChips));
+  bind("coachSave","click",()=>{
+    const v=readCoachInputs();
+    if(!(v.p>0&&v.k>0)){toast("Protein and calories must be above 0");return;}
+    if(v.p>400||v.k>8000){toast("That looks out of range — check the numbers");return;}
+    const nt={p:Math.round(v.p),k:Math.round(v.k),f:Math.round(v.f)||0,c:Math.round(v.c)||0,
+              fib:Math.round(v.fib)||DEFAULT_TARGETS.fib};
+    const changed=JSON.stringify(nt)!==JSON.stringify(targets);
+    targets=nt;saveTargets();
+    if(changed){targetlog.push({d:new Date().toISOString(),targets:nt});saveTargetlog();}
+    planRendered=false;render();renderWeek();renderCoachLine();closeCoach();
+    toast(changed?"Targets updated from coach":"Targets unchanged");
+  });
 
   /* ---------- export / import ---------- */
   function download(name,text,type){
@@ -730,7 +802,7 @@
     allLogKeys().forEach(k=>{logs[k.replace("pt:log:","")]=lsGet(k,[]);});
     logs[dateKey]=entries;
     return {app:"protein-tracker",version:4,schema:4,exported:new Date().toISOString(),
-            targets,customFoods,meals,weights,waist,taps,logs};
+            targets,targetlog,customFoods,meals,weights,waist,taps,logs};
   }
   function markExported(){
     lsSet("pt:lastexport",new Date().toISOString());
@@ -787,6 +859,7 @@
         if(d.meals)lsSet("pt:meals",d.meals);
         if(d.weights)lsSet("pt:weights",d.weights);
         if(d.waist)lsSet("pt:waist",d.waist);   // absent in schema-3 backups — fine
+        if(d.targetlog)lsSet("pt:targetlog",d.targetlog);
         if(d.taps)lsSet("pt:taps",d.taps);
         toast("Backup restored");
         setTimeout(()=>location.reload(),700);
@@ -983,12 +1056,13 @@
     const wrap=$("mbPick");wrap.innerHTML="";
     if(!filter){wrap.innerHTML='';return;}
     FOODS.filter(f=>f.n.toLowerCase().includes(filter)).slice(0,12).forEach(f=>{
-      const b=document.createElement("button");b.className="chip";b.type="button";
+      const d=document.createElement("div");d.className="chip";
       const ds=defServing(f), dm=macrosFor(f,ds.g);
-      b.innerHTML='<div class="nm"></div><div class="mac"><b>'+nice(round(dm.p))+'g P</b> / '+ds.l+'</div>';
-      b.querySelector(".nm").textContent=f.n;
-      b.onclick=()=>openSheet(f,null,"meal");
-      wrap.appendChild(b);
+      d.innerHTML='<button class="cmain" type="button"><div class="nm"></div>'+
+        '<div class="mac"><b>'+nice(round(dm.p))+'g P</b> / '+ds.l+'</div></button>';
+      d.querySelector(".nm").textContent=f.n;
+      d.querySelector(".cmain").onclick=()=>openSheet(f,null,"meal");
+      wrap.appendChild(d);
     });
     if(!wrap.children.length) wrap.innerHTML='<div class="empty" style="grid-column:1/-1;padding:12px">Nothing matches. Save it under My foods on the Today tab first.</div>';
   }
@@ -1183,6 +1257,7 @@
     loadMeals();
     weights=lsGet("pt:weights",[]);
     waist=lsGet("pt:waist",[]);
+    targetlog=lsGet("pt:targetlog",[]);
     taps=lsGet("pt:taps",{});
     entries=loadDay(dateKey);
     rebuildFoods();
