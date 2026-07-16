@@ -1,77 +1,107 @@
 /* Protein Tracker PWA — logic (v2)
-   Storage (localStorage, per-device, offline):
+   Storage (localStorage, per-device, offline — the source of truth):
      pt:log:<YYYY-MM-DD>  entries for that day
      pt:customfoods       permanently saved foods
-     pt:targets           {p,k,f,c}
+     pt:targets           {p,k,f,c,fib} — externally derived (weekly coaching
+                          review); never assume specific values
      pt:weights           [{d:'YYYY-MM-DD', kg:Number}]
+     pt:waist             [{d:'YYYY-MM-DD', cm:Number}] — weekly-ish
      pt:taps              {foodName: tapCount}   -> drives favourites
+     pt:lastexport        ISO timestamp of the last JSON export
+     pt:nudgesnooze       ISO timestamp when the export nudge was dismissed
 */
 (function(){
   "use strict";
+  /* First-run fallback only, until the first coaching targets are entered in
+     Settings. pt:targets is externally derived and drifts — no logic or copy
+     anywhere may assume these specific values. */
   const DEFAULT_TARGETS={p:160,k:1975,f:58,c:200,fib:30};
-  const CIRC=2*Math.PI*88;
+  const CIRC=2*Math.PI*59;   /* matches r=59 in the 140px hero ring */
   const MEALS=["Breakfast","Lunch","Snack","Dinner"];
 
-  /* per = macros per ONE unit (g / ml / egg / white / slice / katori / piece / roti / idli / dosa / tsp) */
+  /* Food model (v2, grams-first):
+       per100  macros per 100 g (or 100 ml) — canonical
+       sv      serving presets [{l:label, g:grams, d:1 if default}]
+       ver     provenance: label | product-page | reference (custom = your label)
+       step    grams step in exact mode
+     Gram weights behind old count units: egg 50 g · white 30 g · cheese slice
+     20 g · roti 40 g · idli 40 g · dosa 80 g · bread slice 30 g · katori 150 g
+     (papaya katori 140 g) · banana 120/160/40 g by variety · apple 180 g ·
+     guava 100 g · orange 130 g · date 7 g · tsp 5 g. Chosen so per-100 values
+     match standard references and old default portions round-trip exactly. */
   const BASE_FOODS=[
     // Protein & dairy
-    {n:"TruNativ Raw Concentrate",cat:"Protein & dairy",unit:"g",def:35,step:5,hint:"1 scoop = 35 g · label: 28.1g P, 0.5g F, 2.7g C, 128 kcal",per:{p:0.8029,f:0.0143,c:0.0771,k:3.657,fib:0.0}},
-    {n:"TruNativ Pro Blend",cat:"Protein & dairy",unit:"g",def:36,step:6,hint:"1 scoop = 36 g · 26 g protein",per:{p:0.733,f:0.0594,c:0.110,k:3.908,fib:0.0}},
-    {n:"Chicken breast (cooked)",cat:"Protein & dairy",unit:"g",def:150,step:25,per:{p:0.30,f:0.036,c:0,k:1.65,fib:0.0}},
-    {n:"Fish – rohu/surmai (cooked)",cat:"Protein & dairy",unit:"g",def:150,step:25,per:{p:0.22,f:0.05,c:0,k:1.35,fib:0.0}},
-    {n:"Tuna (drained)",cat:"Protein & dairy",unit:"g",def:100,step:20,hint:"1 tin ≈ 100 g",per:{p:0.25,f:0.008,c:0,k:1.16,fib:0.0}},
-    {n:"Prawns (cooked)",cat:"Protein & dairy",unit:"g",def:100,step:25,per:{p:0.24,f:0.003,c:0.002,k:0.99,fib:0.0}},
-    {n:"Whole egg",cat:"Protein & dairy",unit:"egg",def:2,step:1,per:{p:6,f:5,c:0.5,k:72,fib:0.0}},
-    {n:"Egg white",cat:"Protein & dairy",unit:"white",def:3,step:1,per:{p:3.6,f:0.06,c:0.2,k:17,fib:0.0}},
-    {n:"Paneer",cat:"Protein & dairy",unit:"g",def:100,step:20,per:{p:0.18,f:0.20,c:0.04,k:2.65,fib:0.0}},
-    {n:"Tofu",cat:"Protein & dairy",unit:"g",def:100,step:25,per:{p:0.08,f:0.048,c:0.019,k:0.76,fib:0.009}},
-    {n:"Soya chunks (dry)",cat:"Protein & dairy",unit:"g",def:50,step:10,per:{p:0.52,f:0.005,c:0.33,k:3.45,fib:0.13}},
-    {n:"Moong sprouts (boiled)",cat:"Protein & dairy",unit:"g",def:100,step:25,hint:"no-cook: steam/soak",per:{p:0.075,f:0.005,c:0.17,k:1.00,fib:0.02}},
-    {n:"Greek yogurt / hung curd",cat:"Protein & dairy",unit:"g",def:150,step:25,per:{p:0.10,f:0.027,c:0.04,k:0.87,fib:0.0}},
-    {n:"Curd (regular)",cat:"Protein & dairy",unit:"g",def:150,step:25,per:{p:0.053,f:0.03,c:0.048,k:0.60,fib:0.0}},
-    {n:"Buttermilk / chaas",cat:"Protein & dairy",unit:"ml",def:200,step:50,hint:"no-cook",per:{p:0.01,f:0.005,c:0.025,k:0.20,fib:0.0}},
-    {n:"Cheese slice",cat:"Protein & dairy",unit:"slice",def:1,step:1,per:{p:3.5,f:4.5,c:1,k:60,fib:0.0}},
-    {n:"Milk – Nandini toned",cat:"Protein & dairy",unit:"ml",def:200,step:50,hint:"per 100 ml: 3.1 g protein",per:{p:0.031,f:0.030,c:0.048,k:0.58,fib:0.0}},
+    {n:"TruNativ Raw Concentrate",cat:"Protein & dairy",unit:"g",ver:"label",hint:"1 scoop = 35 g · label: 28.1g P, 0.5g F, 2.7g C, 128 kcal",per100:{p:80.29,f:1.43,c:7.71,k:365.7,fib:0},sv:[{l:"½ scoop",g:17.5},{l:"1 scoop",g:35,d:1},{l:"1.5 scoop",g:52.5}],step:5,st:1},
+    {n:"TruNativ Pro Blend",cat:"Protein & dairy",unit:"g",ver:"product-page",hint:"1 scoop = 36 g · 26 g protein",per100:{p:73.3,f:5.94,c:11,k:390.8,fib:0},sv:[{l:"½ scoop",g:18},{l:"1 scoop",g:36,d:1},{l:"1.5 scoop",g:54}],step:6,st:1},
+    {n:"Chicken breast (cooked)",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:30,f:3.6,c:0,k:165,fib:0},sv:[{l:"100 g",g:100},{l:"150 g",g:150,d:1},{l:"200 g",g:200}],step:25,st:1},
+    {n:"Fish – rohu/surmai (cooked)",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:22,f:5,c:0,k:135,fib:0},sv:[{l:"100 g",g:100},{l:"150 g",g:150,d:1},{l:"175 g",g:175}],step:25},
+    {n:"Tuna (drained)",cat:"Protein & dairy",unit:"g",ver:"reference",hint:"1 tin ≈ 100 g",per100:{p:25,f:0.8,c:0,k:116,fib:0},sv:[{l:"1 tin (100 g)",g:100,d:1},{l:"½ tin",g:50}],step:20},
+    {n:"Prawns (cooked)",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:24,f:0.3,c:0.2,k:99,fib:0},sv:[{l:"100 g",g:100,d:1},{l:"150 g",g:150}],step:25},
+    {n:"Whole egg",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:12,f:10,c:1,k:144,fib:0},sv:[{l:"1 egg",g:50},{l:"2 eggs",g:100,d:1},{l:"3 eggs",g:150}],step:10,st:1},
+    {n:"Egg white",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:12,f:0.2,c:0.6667,k:56.6667,fib:0},sv:[{l:"1 white",g:30},{l:"3 whites",g:90,d:1},{l:"6 whites",g:180}],step:10,st:1},
+    {n:"Paneer",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:18,f:20,c:4,k:265,fib:0},sv:[{l:"50 g",g:50},{l:"100 g",g:100,d:1},{l:"150 g",g:150}],step:20,st:1},
+    {n:"Tofu",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:8,f:4.8,c:1.9,k:76,fib:0.9},sv:[{l:"100 g",g:100,d:1},{l:"150 g",g:150}],step:25},
+    {n:"Soya chunks (dry)",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:52,f:0.5,c:33,k:345,fib:13},sv:[{l:"25 g",g:25},{l:"50 g",g:50,d:1},{l:"75 g",g:75}],step:10},
+    {n:"Moong sprouts (boiled)",cat:"Protein & dairy",unit:"g",ver:"reference",hint:"no-cook: steam/soak",per100:{p:7.5,f:0.5,c:17,k:100,fib:2},sv:[{l:"100 g",g:100,d:1},{l:"150 g",g:150}],step:25},
+    {n:"Greek yogurt / hung curd",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:10,f:2.7,c:4,k:87,fib:0},sv:[{l:"100 g",g:100},{l:"150 g",g:150,d:1},{l:"200 g",g:200}],step:25},
+    {n:"Curd (regular)",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:5.3,f:3,c:4.8,k:60,fib:0},sv:[{l:"100 g",g:100},{l:"150 g",g:150,d:1}],step:25},
+    {n:"Buttermilk / chaas",cat:"Protein & dairy",unit:"ml",ver:"reference",hint:"no-cook",per100:{p:1,f:0.5,c:2.5,k:20,fib:0},sv:[{l:"1 glass (200 ml)",g:200,d:1}],step:50},
+    {n:"Cheese slice",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:17.5,f:22.5,c:5,k:300,fib:0},sv:[{l:"1 slice",g:20,d:1},{l:"2 slices",g:40}],step:5},
+    {n:"Milk – Nandini toned",cat:"Protein & dairy",unit:"ml",ver:"product-page",hint:"per 100 ml: 3.1 g protein",per100:{p:3.1,f:3,c:4.8,k:58,fib:0},sv:[{l:"100 ml",g:100},{l:"1 glass (200 ml)",g:200,d:1},{l:"250 ml",g:250}],step:50},
     // Grains & carbs
-    {n:"Alpino High-Protein Oats (Choco)",cat:"Grains & carbs",unit:"g",def:50,step:10,hint:"27 g protein / 100 g",per:{p:0.27,f:0.095,c:0.47,k:3.80,fib:0.09}},
-    {n:"Rolled oats (plain)",cat:"Grains & carbs",unit:"g",def:50,step:10,per:{p:0.13,f:0.07,c:0.66,k:3.80,fib:0.1}},
-    {n:"Muesli",cat:"Grains & carbs",unit:"g",def:40,step:10,hint:"no-cook: add milk/curd",per:{p:0.10,f:0.075,c:0.67,k:3.75,fib:0.07}},
-    {n:"Rice (cooked)",cat:"Grains & carbs",unit:"g",def:150,step:25,per:{p:0.027,f:0.003,c:0.28,k:1.30,fib:0.004}},
-    {n:"Sweet potato / shakarkandi",cat:"Grains & carbs",unit:"g",def:150,step:25,per:{p:0.016,f:0.001,c:0.20,k:0.86,fib:0.03}},
-    {n:"Chapati / roti",cat:"Grains & carbs",unit:"roti",def:2,step:1,per:{p:3,f:3,c:20,k:120,fib:2.0}},
-    {n:"Idli",cat:"Grains & carbs",unit:"idli",def:3,step:1,hint:"steam only",per:{p:1.6,f:0.2,c:8,k:40,fib:0.6}},
-    {n:"Dosa (plain)",cat:"Grains & carbs",unit:"dosa",def:1,step:1,per:{p:3,f:4,c:20,k:130,fib:1.2}},
-    {n:"Poha (cooked)",cat:"Grains & carbs",unit:"katori",def:1,step:0.5,hint:"quick cook",per:{p:3,f:5,c:34,k:200,fib:1.5}},
-    {n:"Brown bread",cat:"Grains & carbs",unit:"slice",def:2,step:1,per:{p:4,f:1,c:14,k:80,fib:1.5}},
-    {n:"Roasted chana",cat:"Grains & carbs",unit:"g",def:30,step:10,per:{p:0.20,f:0.055,c:0.53,k:3.65,fib:0.15}},
-    {n:"Dal / rajma (cooked)",cat:"Grains & carbs",unit:"katori",def:1,step:0.5,hint:"1 katori ≈ 150 g",per:{p:7,f:3,c:18,k:120,fib:5.0}},
+    {n:"Alpino High-Protein Oats (Choco)",cat:"Grains & carbs",unit:"g",ver:"product-page",hint:"27 g protein / 100 g",per100:{p:27,f:9.5,c:47,k:380,fib:9},sv:[{l:"40 g",g:40},{l:"50 g",g:50,d:1},{l:"60 g",g:60}],step:10},
+    {n:"Rolled oats (plain)",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:13,f:7,c:66,k:380,fib:10},sv:[{l:"40 g",g:40},{l:"50 g",g:50,d:1},{l:"60 g",g:60}],step:10},
+    {n:"Muesli",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"no-cook: add milk/curd",per100:{p:10,f:7.5,c:67,k:375,fib:7},sv:[{l:"40 g",g:40,d:1},{l:"60 g",g:60}],step:10},
+    {n:"Rice (cooked)",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:2.7,f:0.3,c:28,k:130,fib:0.4},sv:[{l:"100 g",g:100},{l:"150 g",g:150,d:1},{l:"200 g",g:200}],step:25,st:1},
+    {n:"Sweet potato / shakarkandi",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:1.6,f:0.1,c:20,k:86,fib:3},sv:[{l:"100 g",g:100},{l:"150 g",g:150,d:1},{l:"200 g",g:200}],step:25,st:1},
+    {n:"Chapati / roti",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:7.5,f:7.5,c:50,k:300,fib:5},sv:[{l:"1 roti",g:40},{l:"2 rotis",g:80,d:1},{l:"3 rotis",g:120}],step:10},
+    {n:"Idli",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"steam only",per100:{p:4,f:0.5,c:20,k:100,fib:1.5},sv:[{l:"2 idli",g:80},{l:"3 idli",g:120,d:1},{l:"4 idli",g:160}],step:10},
+    {n:"Dosa (plain)",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:3.75,f:5,c:25,k:162.5,fib:1.5},sv:[{l:"1 dosa",g:80,d:1},{l:"2 dosas",g:160}],step:20},
+    {n:"Poha (cooked)",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"quick cook",per100:{p:2,f:3.3333,c:22.6667,k:133.3333,fib:1},sv:[{l:"½ katori (75 g)",g:75},{l:"1 katori (150 g)",g:150,d:1}],step:25},
+    {n:"Brown bread",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:13.3333,f:3.3333,c:46.6667,k:266.6667,fib:5},sv:[{l:"1 slice",g:30},{l:"2 slices",g:60,d:1}],step:10},
+    {n:"Roasted chana",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:20,f:5.5,c:53,k:365,fib:15},sv:[{l:"30 g",g:30,d:1},{l:"50 g",g:50}],step:10},
+    {n:"Dal / rajma (cooked)",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"1 katori ≈ 150 g",per100:{p:4.6667,f:2,c:12,k:80,fib:3.3333},sv:[{l:"½ katori (75 g)",g:75},{l:"1 katori (150 g)",g:150,d:1},{l:"1.5 katori (225 g)",g:225}],step:25},
     // Vegetables
-    {n:"Spinach / palak (cooked)",cat:"Vegetables",unit:"g",def:100,step:25,per:{p:0.029,f:0.004,c:0.036,k:0.23,fib:0.024}},
-    {n:"Broccoli (cooked)",cat:"Vegetables",unit:"g",def:100,step:25,per:{p:0.028,f:0.004,c:0.07,k:0.35,fib:0.033}},
-    {n:"Mixed veg sabzi (1 tsp oil)",cat:"Vegetables",unit:"katori",def:1,step:0.5,per:{p:2,f:4,c:8,k:75,fib:3.0}},
-    {n:"Sambar",cat:"Vegetables",unit:"katori",def:1,step:0.5,per:{p:4,f:2.5,c:12,k:90,fib:3.0}},
-    {n:"Kosambari (moong salad)",cat:"Vegetables",unit:"katori",def:1,step:0.5,hint:"no-cook",per:{p:5,f:2,c:12,k:90,fib:4.0}},
-    {n:"Green salad (dressed)",cat:"Vegetables",unit:"katori",def:1,step:0.5,per:{p:1,f:0.2,c:4,k:20,fib:1.5}},
+    {n:"Carrot (raw)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:0.93,f:0.24,c:9.6,k:41,fib:2.8},sv:[{l:"1 medium (60 g)",g:60},{l:"100 g",g:100,d:1}],step:10},
+    {n:"Cucumber (raw)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:0.65,f:0.11,c:3.6,k:15,fib:0.5},sv:[{l:"100 g",g:100,d:1},{l:"\u00bd medium (150 g)",g:150}],step:25},
+    {n:"Bhurji veg (onion/tomato/capsicum)",cat:"Vegetables",unit:"g",ver:"reference",hint:"raw mix for bhurji",per100:{p:1.2,f:0.2,c:6.8,k:32,fib:1.7},sv:[{l:"1 katori (100 g)",g:100,d:1}],step:25},
+    {n:"Spinach / palak (cooked)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:2.9,f:0.4,c:3.6,k:23,fib:2.4},sv:[{l:"100 g",g:100,d:1},{l:"150 g",g:150}],step:25},
+    {n:"Broccoli (cooked)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:2.8,f:0.4,c:7,k:35,fib:3.3},sv:[{l:"100 g",g:100,d:1},{l:"150 g",g:150}],step:25},
+    {n:"Mixed veg sabzi (1 tsp oil)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:1.3333,f:2.6667,c:5.3333,k:50,fib:2},sv:[{l:"½ katori (75 g)",g:75},{l:"1 katori (150 g)",g:150,d:1},{l:"1.5 katori (225 g)",g:225}],step:25},
+    {n:"Sambar",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:2.6667,f:1.6667,c:8,k:60,fib:2},sv:[{l:"½ katori (75 g)",g:75},{l:"1 katori (150 g)",g:150,d:1},{l:"1.5 katori (225 g)",g:225}],step:25},
+    {n:"Kosambari (moong salad)",cat:"Vegetables",unit:"g",ver:"reference",hint:"no-cook",per100:{p:3.3333,f:1.3333,c:8,k:60,fib:2.6667},sv:[{l:"½ katori (75 g)",g:75},{l:"1 katori (150 g)",g:150,d:1}],step:25},
+    {n:"Green salad (dressed)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:0.6667,f:0.1333,c:2.6667,k:13.3333,fib:1},sv:[{l:"1 katori (150 g)",g:150,d:1},{l:"2 katori (300 g)",g:300}],step:25},
     // Fruit
-    {n:"Banana – Robusta/Cavendish",cat:"Fruit",unit:"piece",def:1,step:1,hint:"~120g edible, the common everyday banana",per:{p:1.32,f:0.36,c:27.36,k:106.8,fib:3.12}},
-    {n:"Banana – Nendran",cat:"Fruit",unit:"piece",def:1,step:1,hint:"~160g edible, larger Kerala/coastal variety",per:{p:1.76,f:0.48,c:36.48,k:142.4,fib:4.16}},
-    {n:"Banana – Yelakki (Elaichi)",cat:"Fruit",unit:"piece",def:2,step:1,hint:"~40g edible each, small — figures below are for 2",per:{p:0.44,f:0.12,c:9.12,k:35.6,fib:1.04}},
-    {n:"Apple",cat:"Fruit",unit:"piece",def:1,step:1,per:{p:0.5,f:0.3,c:25,k:95,fib:4.4}},
-    {n:"Guava",cat:"Fruit",unit:"piece",def:1,step:1,per:{p:2.6,f:1,c:14,k:68,fib:5.4}},
-    {n:"Papaya (cubes)",cat:"Fruit",unit:"katori",def:1,step:0.5,per:{p:0.7,f:0.4,c:15,k:60,fib:2.5}},
-    {n:"Orange",cat:"Fruit",unit:"piece",def:1,step:1,per:{p:1.2,f:0.2,c:15,k:62,fib:3.1}},
-    {n:"Dates",cat:"Fruit",unit:"piece",def:2,step:1,per:{p:0.2,f:0,c:5.3,k:20,fib:0.8}},
-    {n:"Coconut water",cat:"Fruit",unit:"ml",def:200,step:50,hint:"no-cook",per:{p:0.007,f:0,c:0.045,k:0.19,fib:0.0}},
+    {n:"Watermelon (cubes)",cat:"Fruit",unit:"g",ver:"reference",per100:{p:0.61,f:0.15,c:7.55,k:30,fib:0.4},sv:[{l:"1 katori (150 g)",g:150,d:1},{l:"2 katori (300 g)",g:300}],step:25},
+    {n:"Banana – Robusta/Cavendish",cat:"Fruit",unit:"g",ver:"reference",hint:"~120g edible, the common everyday banana",per100:{p:1.1,f:0.3,c:22.8,k:89,fib:2.6},sv:[{l:"1 banana",g:120,d:1},{l:"½ banana",g:60}],step:10},
+    {n:"Banana – Nendran",cat:"Fruit",unit:"g",ver:"reference",hint:"~160g edible, larger Kerala/coastal variety",per100:{p:1.1,f:0.3,c:22.8,k:89,fib:2.6},sv:[{l:"1 banana",g:160,d:1},{l:"½ banana",g:80}],step:10},
+    {n:"Banana – Yelakki (Elaichi)",cat:"Fruit",unit:"g",ver:"reference",hint:"~40g edible each, small — figures below are for 2",per100:{p:1.1,f:0.3,c:22.8,k:89,fib:2.6},sv:[{l:"1 small",g:40},{l:"2 small",g:80,d:1}],step:10},
+    {n:"Apple",cat:"Fruit",unit:"g",ver:"reference",per100:{p:0.2778,f:0.1667,c:13.8889,k:52.7778,fib:2.4444},sv:[{l:"1 apple",g:180,d:1},{l:"½ apple",g:90}],step:10},
+    {n:"Guava",cat:"Fruit",unit:"g",ver:"reference",per100:{p:2.6,f:1,c:14,k:68,fib:5.4},sv:[{l:"1 guava",g:100,d:1},{l:"2 guavas",g:200}],step:10},
+    {n:"Papaya (cubes)",cat:"Fruit",unit:"g",ver:"reference",per100:{p:0.5,f:0.2857,c:10.7143,k:42.8571,fib:1.7857},sv:[{l:"1 katori (140 g)",g:140,d:1},{l:"2 katori (280 g)",g:280}],step:20},
+    {n:"Orange",cat:"Fruit",unit:"g",ver:"reference",per100:{p:0.9231,f:0.1538,c:11.5385,k:47.6923,fib:2.3846},sv:[{l:"1 orange",g:130,d:1}],step:10},
+    {n:"Dates",cat:"Fruit",unit:"g",ver:"reference",per100:{p:2.8571,f:0,c:75.7143,k:285.7143,fib:11.4286},sv:[{l:"2 dates",g:14,d:1},{l:"4 dates",g:28}],step:7},
+    {n:"Coconut water",cat:"Fruit",unit:"ml",ver:"reference",hint:"no-cook",per100:{p:0.7,f:0,c:4.5,k:19,fib:0},sv:[{l:"1 glass (200 ml)",g:200,d:1}],step:50},
+    {n:"Moong dal (dry)",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"dry \u2014 ~2 chilla per 50 g",per100:{p:24,f:1.2,c:59,k:347,fib:16.3},sv:[{l:"for 2 chilla (50 g)",g:50,d:1},{l:"25 g",g:25}],step:5},
+    {n:"Dalia / broken wheat (cooked)",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"USDA bulgur, cooked",per100:{p:3.08,f:0.24,c:18.6,k:83,fib:4.5},sv:[{l:"1 katori (150 g)",g:150,d:1},{l:"1.5 katori (225 g)",g:225}],step:25,st:1},
+    {n:"Upma (no oil)",cat:"Grains & carbs",unit:"g",ver:"estimate",hint:"sooji + veg, no oil",per100:{p:3.8,f:0.4,c:22,k:110,fib:1.4},sv:[{l:"1 katori (150 g)",g:150,d:1}],step:25},
+    {n:"Ragi mudde / ragi rice (cooked)",cat:"Grains & carbs",unit:"g",ver:"estimate",hint:"IFCT dry values \u00f7 cooked hydration",per100:{p:2.1,f:0.4,c:19,k:91,fib:3.2},sv:[{l:"1 katori (150 g)",g:150,d:1},{l:"1.5 katori (225 g)",g:225}],step:25},
+    {n:"Jowar rice (cooked)",cat:"Grains & carbs",unit:"g",ver:"estimate",hint:"IFCT dry values \u00f7 cooked hydration",per100:{p:2.9,f:0.5,c:20,k:97,fib:2.7},sv:[{l:"1 katori (150 g)",g:150,d:1}],step:25},
+    {n:"Curd rice",cat:"Grains & carbs",unit:"g",ver:"estimate",hint:"~2:1 rice:curd",per100:{p:3.6,f:1.2,c:20,k:107,fib:0.3},sv:[{l:"1 katori (150 g)",g:150,d:1}],step:25},
+    {n:"Veg pulao",cat:"Grains & carbs",unit:"g",ver:"estimate",hint:"oil included",per100:{p:2.5,f:3.5,c:21,k:130,fib:1.3},sv:[{l:"1 katori (150 g)",g:150,d:1},{l:"1 plate (250 g)",g:250}],step:25},
+    {n:"Jeera / lemon rice",cat:"Grains & carbs",unit:"g",ver:"estimate",hint:"tempering oil included",per100:{p:2.5,f:4.5,c:24,k:150,fib:0.7},sv:[{l:"1 katori (150 g)",g:150,d:1}],step:25},
+    {n:"Chicken biryani",cat:"Grains & carbs",unit:"g",ver:"estimate",hint:"home-style; restaurant runs higher",per100:{p:7.5,f:5,c:16,k:140,fib:0.8},sv:[{l:"1 katori (150 g)",g:150,d:1},{l:"1 plate (250 g)",g:250}],step:25},
+    {n:"Isabgol (psyllium husk)",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"stir into water or curd — fibre top-up",per100:{p:1.5,f:0.3,c:85,k:205,fib:78},sv:[{l:"1 tsp",g:5},{l:"1 tbsp",g:10,d:1}],step:5,st:1},
     // Nuts & fats
-    {n:"Almonds",cat:"Nuts & fats",unit:"g",def:10,step:5,per:{p:0.21,f:0.49,c:0.22,k:5.80,fib:0.125}},
-    {n:"Walnuts",cat:"Nuts & fats",unit:"g",def:10,step:5,per:{p:0.15,f:0.65,c:0.14,k:6.54,fib:0.067}},
-    {n:"Peanuts (roasted)",cat:"Nuts & fats",unit:"g",def:20,step:5,per:{p:0.26,f:0.49,c:0.16,k:5.67,fib:0.085}},
-    {n:"Cashews",cat:"Nuts & fats",unit:"g",def:15,step:5,per:{p:0.18,f:0.44,c:0.30,k:5.53,fib:0.033}},
-    {n:"Chia seeds",cat:"Nuts & fats",unit:"g",def:12,step:3,per:{p:0.17,f:0.31,c:0.42,k:4.86,fib:0.34}},
-    {n:"Flax seeds",cat:"Nuts & fats",unit:"g",def:10,step:5,per:{p:0.18,f:0.42,c:0.29,k:5.34,fib:0.27}},
-    {n:"Peanut butter",cat:"Nuts & fats",unit:"g",def:15,step:5,per:{p:0.25,f:0.50,c:0.20,k:5.90,fib:0.06}},
-    {n:"Coconut (fresh grated)",cat:"Nuts & fats",unit:"g",def:20,step:10,per:{p:0.03,f:0.33,c:0.15,k:3.54,fib:0.09}},
-    {n:"Ghee / oil",cat:"Nuts & fats",unit:"tsp",def:1,step:1,per:{p:0,f:5,c:0,k:45,fib:0.0}}
+    {n:"Almonds",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:21,f:49,c:22,k:580,fib:12.5},sv:[{l:"10 g (~8 nuts)",g:10,d:1},{l:"20 g",g:20}],step:5},
+    {n:"Walnuts",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:15,f:65,c:14,k:654,fib:6.7},sv:[{l:"10 g",g:10,d:1},{l:"20 g",g:20}],step:5},
+    {n:"Peanuts (roasted)",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:26,f:49,c:16,k:567,fib:8.5},sv:[{l:"20 g",g:20,d:1},{l:"30 g",g:30}],step:5},
+    {n:"Cashews",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:18,f:44,c:30,k:553,fib:3.3},sv:[{l:"15 g",g:15,d:1},{l:"30 g",g:30}],step:5},
+    {n:"Chia seeds",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:17,f:31,c:42,k:486,fib:34},sv:[{l:"1 tbsp",g:12,d:1},{l:"2 tbsp",g:24}],step:3},
+    {n:"Flax seeds",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:18,f:42,c:29,k:534,fib:27},sv:[{l:"1 tbsp",g:10,d:1},{l:"2 tbsp",g:20}],step:5},
+    {n:"Peanut butter",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:25,f:50,c:20,k:590,fib:6},sv:[{l:"1 tbsp",g:15,d:1},{l:"2 tbsp",g:30}],step:5},
+    {n:"Coconut (fresh grated)",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:3,f:33,c:15,k:354,fib:9},sv:[{l:"20 g",g:20,d:1},{l:"30 g",g:30}],step:10},
+    {n:"Ghee / oil",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:0,f:100,c:0,k:900,fib:0},sv:[{l:"1 tsp",g:5,d:1},{l:"1 tbsp",g:15}],step:5}
   ];
   const BASE_CATS=["My foods","Protein & dairy","Grains & carbs","Vegetables","Fruit","Nuts & fats"];
 
@@ -82,7 +112,7 @@
   function warn(msg){ try{console.warn("[tracker] "+msg);}catch(e){} }
   const prog=$("prog"); prog.style.strokeDasharray=CIRC;
 
-  let entries=[], customFoods=[], FOODS=[], targets={}, weights=[], taps={};
+  let entries=[], customFoods=[], FOODS=[], targets={}, weights=[], waist=[], taps={}, targetlog=[];
   let sheetFood=null, sheetMeal=null, sheetMode="log", histDate=null;
   const dateKey=todayKey();
 
@@ -104,6 +134,7 @@
   function saveCustom(){lsSet("pt:customfoods",customFoods);}
   function saveTargets(){lsSet("pt:targets",targets);}
   function saveWeights(){lsSet("pt:weights",weights);}
+  function saveWaist(){lsSet("pt:waist",waist);}
   function saveTaps(){lsSet("pt:taps",taps);}
   function allLogKeys(){
     const out=[];
@@ -113,6 +144,37 @@
 
   function rebuildFoods(){FOODS=customFoods.map(c=>Object.assign({},c,{mine:true})).concat(BASE_FOODS);}
   function findFood(n){return FOODS.find(f=>f.n===n);}
+
+  /* ---------- food model helpers (grams-first) ---------- */
+  function perGram(f){          // macros per 1 g/ml — or per 1 unit for count-based customs
+    if(f.countBased) return f.perUnit;
+    const h=f.per100;
+    return {p:h.p/100,f:h.f/100,c:h.c/100,k:h.k/100,fib:(h.fib||0)/100};
+  }
+  function macrosFor(f,amt){
+    const g=perGram(f);
+    return {p:g.p*amt,f:g.f*amt,c:g.c*amt,k:g.k*amt,fib:(g.fib||0)*amt};
+  }
+  function defServing(f){
+    if(f.countBased) return {l:fmtAmt(f.def)+" "+f.unit,g:f.def,d:1};
+    return (f.sv||[]).find(s=>s.d)||(f.sv||[])[0]||{l:"100 "+f.unit,g:100};
+  }
+  function defAmt(f){return defServing(f).g;}
+  const VER_LABEL={label:"✓ label-verified","product-page":"from product page",reference:"reference values",estimate:"estimate",custom:"your label"};
+  /* v1 custom foods stored macros per one <unit> ({per, def}). g/ml foods
+     convert exactly to per100; count-based units (piece, serving…) keep a
+     per-unit model — no gram weight exists to invent. Idempotent. */
+  function migrateCustom(c){
+    if(c.per100||c.countBased) return c;
+    const per=c.per||{};
+    if(c.unit==="g"||c.unit==="ml"){
+      return {n:c.n,cat:"My foods",unit:c.unit,ver:"custom",
+        per100:{p:(per.p||0)*100,f:(per.f||0)*100,c:(per.c||0)*100,k:(per.k||0)*100,fib:(per.fib||0)*100},
+        sv:[{l:fmtAmt(c.def)+" "+c.unit,g:c.def,d:1}],step:c.step||5};
+    }
+    return {n:c.n,cat:"My foods",unit:c.unit||"serving",ver:"custom",countBased:true,
+      perUnit:{p:per.p||0,f:per.f||0,c:per.c||0,k:per.k||0,fib:per.fib||0},def:c.def||1,step:c.step||1};
+  }
   function sumOf(list){return list.reduce((a,e)=>{a.p+=e.p||0;a.f+=e.f||0;a.c+=e.c||0;a.k+=e.k||0;a.fib+=e.fib||0;return a;},{p:0,f:0,c:0,k:0,fib:0});}
   function totals(){return sumOf(entries);}
   function guessMeal(){
@@ -124,85 +186,95 @@
   }
 
   /* ---------- main render ---------- */
+  /* hero shows whole grams — at a glance "149 of 160" is the information;
+     decimals live in the log rows and the scrolled-appbar readout */
+  function heroRow(id,val,target,barId,opts){
+    opts=opts||{};
+    const box=$(id); if(!box)return;
+    const v=box.querySelector("#"+opts.valId);
+    if(v)v.textContent=opts.oneDp?nice(round(val)):String(Math.round(val));
+    const of=box.querySelector(".of");
+    if(of)of.textContent="/ "+target+(opts.unitless?"":" g");
+    const bar=$(barId);
+    if(bar)bar.style.width=(Math.min(val/(target||1),1)*100)+"%";
+    if(opts.overAt!=null)box.classList.toggle("over",val>opts.overAt);
+    if(opts.metAt!=null)box.classList.toggle("met",val>=opts.metAt);
+  }
   function render(){
     const t=totals(), p=round(t.p);
-    $("pnum").textContent=nice(p);
+    $("pnum").textContent=String(Math.round(p));
     $("ptarget").textContent="/ "+targets.p+" g";
     prog.style.strokeDashoffset=CIRC*(1-Math.min(p/targets.p,1));
-    const rem=round(targets.p-p);
-    $("remain").innerHTML = rem>0 ? "<b>"+nice(rem)+" g</b> to go" : "<b>+"+nice(-rem)+" g</b> over target";
     $("hero").classList.toggle("hit",p>=targets.p);
     $("miniP").innerHTML="<b>"+nice(p)+"</b>/"+targets.p+" g";
-    $("cal").textContent=Math.round(t.k);
-    $("calof").textContent="/ "+targets.k+" kcal";
-    $("calbar").style.width=(Math.min(t.k/targets.k,1)*100)+"%";
-    $("calbox").classList.toggle("over",t.k>targets.k+40);
-    $("fat").innerHTML=nice(round(t.f))+'<span class="of">/'+targets.f+'g</span>';
-    $("carb").innerHTML=Math.round(t.c)+'<span class="of">/'+targets.c+'g</span>';
-    const fibEl=$("fib");
-    if(fibEl){
-      fibEl.innerHTML=nice(round(t.fib))+'<span class="of">/'+targets.fib+'g</span>';
-      const fbox=$("fibbox"); if(fbox) fbox.classList.toggle("met", t.fib>=targets.fib);
-    }
+    heroRow("calbox",t.k,targets.k,"calbar",{valId:"cal",unitless:true,overAt:targets.k+40});
+    heroRow("fatbox",t.f,targets.f,"fatbar",{valId:"fat",overAt:targets.f+5});
+    heroRow("carbbox",t.c,targets.c,"carbbar",{valId:"carb"});
+    heroRow("fibbox",t.fib,targets.fib,"fibbar",{valId:"fib",oneDp:true,metAt:targets.fib});
     $("footTargets").textContent="Targets: "+targets.p+" g protein · "+targets.k+" kcal · fat "+targets.f+" g · carbs "+targets.c+" g · fibre "+targets.fib+" g";
-    renderRecommender(t);
+    renderRecommender();
     renderLog();
   }
 
-  /* ---------- recommender ---------- */
-  function renderRecommender(t){
-    const box=$("rec");
-    const remP=round(targets.p-t.p), remK=Math.round(targets.k-t.k);
-    if(remP<=2){
-      box.classList.add("done");
-      const msg = remK>150 ? ("Protein done — about <b>"+remK+" kcal</b> of room left if you're hungry.")
-              : remK<-40 ? ("Protein done. You're <b>"+Math.abs(remK)+" kcal</b> over — ease off for the rest of the day.")
-              : "Protein done and calories on target. You're set.";
-      box.innerHTML='<div class="rh"><h3>Close the gap</h3></div><div class="celebrate">✓ '+targets.p+' g protein reached</div><div class="sub" style="margin-top:6px">'+msg+'</div>';
+  /* ---------- recommender (multi-macro engine lives in recommend.js) ----------
+     Priority protein -> calories -> fibre -> fat/carb flex. First suggestion
+     is the next plan meal adapted to the live targets; ad-hoc closers below. */
+  function renderRecommender(){
+    const box=$("rec"); if(!box)return;
+    if(!window.RECOMMEND||!window.MEAL_PLAN){box.innerHTML="";return;}
+    const now=new Date();
+    const r=RECOMMEND.recommend(entries,targets,window.MEAL_PLAN,FOODS,
+      {h:now.getHours()+now.getMinutes()/60,dateKey:dateKey});
+    box.classList.toggle("done",r.kind==="done");
+    let html='<div class="rh"><h3>'+(r.kind==="meal"?"From your plan":r.headline)+'</h3></div>';
+    if(r.kind==="done"){
+      box.innerHTML=html+'<div class="celebrate">✓ '+r.headline+'</div><div class="sub" style="margin-top:6px">'+r.reasoning+'</div>';
       return;
     }
-    box.classList.remove("done");
-    const scored=FOODS.filter(f=>f.per.p>0 && (f.per.p/f.per.k)>=0.09)
-      .map(f=>{
-        const need=remP/f.per.p;
-        const amt=Math.min(need,f.def*1.5);           // realistic single portion
-        const rAmt=Math.max(f.step,Math.round(amt/f.step)*f.step);
-        const addP=f.per.p*rAmt, addK=f.per.k*rAmt;
-        return {f,amt:rAmt,addP,addK,partial:need>f.def*1.5,fits:addK<=remK+40,eff:f.per.k/f.per.p};
-      })
-      .filter(s=> s.addP >= Math.min(10, Math.max(4, remP*0.3)))   // must make a real dent
-      .sort((a,b)=> (a.fits!==b.fits ? (a.fits?-1:1) : a.eff-b.eff));
-
-    const pool=scored.slice(0,10);
-    if(!pool.length){ box.innerHTML='<div class="rh"><h3>Close the gap</h3></div><div class="sub">'+nice(remP)+' g protein left. Nothing in your list fits the remaining calories — a lean protein (whey, egg whites, tuna) is your best bet.</div>'; return; }
-    const seed=(new Date().getDate()+entries.length)%pool.length;
-    const rot=pool.slice(seed).concat(pool.slice(0,seed));
-    const cands=[], cats=new Set();
-    for(const s of rot){ if(cands.length>=3)break; if(cats.has(s.f.cat))continue; cats.add(s.f.cat); cands.push(s); }
-    for(const s of rot){ if(cands.length>=3)break; if(!cands.includes(s))cands.push(s); }
-    cands.sort((a,b)=> (a.fits!==b.fits ? (a.fits?-1:1) : a.eff-b.eff));
-
-    let html='<div class="rh"><h3>Close the gap</h3></div>'+
-      '<div class="sub">You have <b>'+nice(remP)+' g protein</b> and <b>'+remK+' kcal</b> left today. Quickest ways to close it:</div><div class="opts">';
-    cands.forEach((s,i)=>{
-      const over = !s.fits ? ' <span class="over">(+'+Math.round(s.addK-remK)+' over kcal)</span>' : '';
-      const partial = s.partial ? ' · gets you part-way' : '';
-      html+='<div class="opt"><div class="oi"><div class="on"></div>'+
-        '<div class="oq"><b>+'+nice(round(s.addP))+'g P</b> · '+Math.round(s.addK)+' kcal'+over+partial+'</div></div>'+
-        '<button class="oadd" data-i="'+i+'">'+fmtAmt(s.amt)+' '+s.f.unit+'</button></div>';
-    });
-    box.innerHTML=html+'</div>';
+    html+='<div class="sub">'+r.reasoning+'</div>';
+    if(r.kind==="meal"){
+      const m=r.meal;
+      html+='<div class="recmeal"><div class="rmh"><span class="potag">'+m.tag+'</span><span class="rmn"></span></div>'+
+        '<ul class="poing">'+m.items.map(it=>'<li>'+esc(planItemLabel(it))+'</li>').join("")+'</ul>'+
+        '<div class="pomac">'+macLine(m.totals)+'</div>'+
+        '<button class="rlog" id="recLog">Log this meal</button></div>';
+    }
+    if(r.adhoc&&r.adhoc.length){
+      html+='<div class="sub" style="margin-top:10px">'+(r.kind==="meal"?"Or close it à la carte:":"Quickest ways to close it:")+'</div><div class="opts">';
+      r.adhoc.forEach((s,i)=>{
+        const over=!s.fits?' <span class="over">(+'+s.overK+' over kcal)</span>':'';
+        const partial=s.partial?' · gets you part-way':'';
+        const gain= s.mode==="fibre" ? '+'+nice(round(s.adds.fib))+'g fibre'
+                  : s.mode==="carb" ? '+'+Math.round(s.adds.c)+'g C'
+                  : '+'+nice(round(s.adds.p))+'g P';
+        html+='<div class="opt"><div class="oi"><div class="on"></div>'+
+          '<div class="oq"><b>'+gain+'</b> · '+Math.round(s.adds.k)+' kcal'+over+partial+'</div></div>'+
+          '<button class="oadd" data-i="'+i+'">'+fmtAmt(s.amt)+' '+s.unit+'</button></div>';
+      });
+      html+='</div>';
+    }
+    box.innerHTML=html;
+    const rmn=box.querySelector(".rmn"); if(rmn&&r.meal) rmn.textContent=r.meal.name;
     box.querySelectorAll(".oadd").forEach(btn=>{
-      const s=cands[+btn.dataset.i];
-      btn.parentElement.querySelector(".on").textContent=s.f.n;
-      btn.onclick=()=>openSheet(s.f,s.amt);
+      const s=r.adhoc[+btn.dataset.i];
+      btn.parentElement.querySelector(".on").textContent=s.food;
+      btn.onclick=()=>{const f=findFood(s.food); if(f)openSheet(f,s.amt);};
     });
+    const lg=$("recLog");
+    if(lg) lg.onclick=()=>{
+      const m=r.meal;
+      addEntry({n:m.slot+" "+m.tag+" — "+m.name+" (plan)",amt:null,unit:"",meal:m.logSlot,
+        note:m.items.map(planItemLabel).join(" · "),
+        p:m.totals.p,f:m.totals.f,c:m.totals.c,k:m.totals.k,fib:m.totals.fib});
+      toast("+"+nice(round(m.totals.p))+" g protein · "+m.name);
+    };
   }
 
   /* ---------- today's log, grouped by meal ---------- */
   function entryRow(e,removable){
     const row=document.createElement("div");row.className="row";
-    const q=e.amt!=null?(fmtAmt(e.amt)+" "+e.unit):(e.note||"");
+    // q can carry user-typed strings (custom-food units, meal ingredient notes) — escape it
+    const q=esc(e.lbl||(e.amt!=null?(fmtAmt(e.amt)+" "+e.unit):(e.note||"")));
     row.innerHTML='<div class="rn"><div class="rt"></div><div class="rq">'+q+'</div></div>'+
       '<div class="rm"><b>'+nice(round(e.p))+'g P</b><br>'+Math.round(e.k)+' kcal</div>'+
       (removable?'<button class="x" aria-label="Remove entry">×</button>':'');
@@ -249,7 +321,8 @@
         b.querySelector(".fn").textContent=f.n;
         b.onclick=()=>logMeal(f.meal);
       } else {
-        b.innerHTML='<div class="fn"></div><div class="fm">'+nice(f.per.p*f.def)+'g P · '+fmtAmt(f.def)+f.unit+'</div>';
+        const ds=defServing(f), dm=macrosFor(f,ds.g);
+        b.innerHTML='<div class="fn"></div><div class="fm">'+nice(round(dm.p))+'g P · '+ds.l+'</div>';
         b.querySelector(".fn").textContent=f.n;
         b.onclick=()=>openSheet(f);
       }
@@ -280,12 +353,15 @@
       const body=document.createElement("div");body.className="accbody";
       const grid=document.createElement("div");grid.className="chips";
       items.forEach(f=>{
-        const b=document.createElement("button");b.className="chip"+(f.mine?" mine":"");b.type="button";
-        b.innerHTML='<div class="nm"></div><div class="mac"><b>'+nice(f.per.p*f.def)+'g P</b> · '+
-          Math.round(f.per.k*f.def)+' kcal / '+fmtAmt(f.def)+f.unit+'</div>';
-        b.querySelector(".nm").textContent=f.n;
-        b.onclick=()=>openSheet(f);
-        grid.appendChild(b);
+        const wrap=document.createElement("div");wrap.className="chip"+(f.mine?" mine":"");
+        const ds=defServing(f), dm=macrosFor(f,ds.g);
+        wrap.innerHTML='<button class="cmain" type="button"><div class="nm"></div>'+
+          '<div class="mac"><b>'+nice(round(dm.p))+'g P</b> · '+Math.round(dm.k)+' kcal / '+ds.l+'</div></button>'+
+          '<button class="cadd" type="button" aria-label="Log '+esc(ds.l)+' of '+esc(f.n)+' now">+</button>';
+        wrap.querySelector(".nm").textContent=f.n;
+        wrap.querySelector(".cmain").onclick=()=>openSheet(f);
+        wrap.querySelector(".cadd").onclick=()=>quickAdd(f);
+        grid.appendChild(wrap);
       });
       body.appendChild(grid);acc.appendChild(body);
       // remember which sections you keep open (only when not searching)
@@ -296,6 +372,18 @@
       wrap.appendChild(acc);
     });
     if(!matches) wrap.innerHTML='<div class="empty">No foods match \u201c'+filter+'\u201d. Add it below to save it permanently.</div>';
+  }
+
+  /* ---------- one-tap quick add: default serving, undo via the log row × ---------- */
+  function quickAdd(f){
+    const ds=defServing(f), amt=ds.g, m=macrosFor(f,amt);
+    let lbl=null;
+    if(!f.countBased && !/^[\d.½]+ ?(g|ml)/.test(ds.l))
+      lbl = /\(\d+(\.\d+)? ?(g|ml)\)/.test(ds.l) ? ds.l : ds.l+" · "+fmtAmt(amt)+" "+f.unit;
+    const meal=guessMeal();
+    addEntry({n:f.n,amt:amt,unit:f.unit,lbl:lbl,meal:meal,p:m.p,f:m.f,c:m.c,k:m.k,fib:m.fib});
+    taps[f.n]=(taps[f.n]||0)+1;saveTaps();renderFavs();
+    toast("+"+nice(round(m.p))+" g protein · "+ds.l+" · "+meal);
   }
 
   /* ---------- generic sheet open/close ---------- */
@@ -312,12 +400,54 @@
     sheetMeal=meal;
     $("sSeg").querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.m===meal));
   }
+  let qtyMode="sv", selSv=0;   // sv = serving presets, exact = grams/ml stepper
+  function currentAmt(){
+    if(!sheetFood)return 0;
+    if(qtyMode==="sv"&&!sheetFood.countBased) return (sheetFood.sv[selSv]||defServing(sheetFood)).g;
+    return parseFloat($("sAmt").value)||0;
+  }
+  function renderQtyUI(){
+    const f=sheetFood; if(!f)return;
+    const modeSeg=$("sQMode"), presets=$("sPresets"), stepper=$("sStepper");
+    if(f.countBased){
+      if(modeSeg)modeSeg.style.display="none";
+      if(presets)presets.style.display="none";
+      stepper.style.display="";
+      $("sUnit").textContent=f.unit;
+    } else {
+      if(modeSeg){
+        modeSeg.style.display="grid";
+        modeSeg.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.q===qtyMode));
+      }
+      $("sUnit").textContent=f.unit;
+      if(presets){
+        presets.style.display = qtyMode==="sv" ? "grid" : "none";
+        presets.innerHTML="";
+        f.sv.forEach((s,i)=>{
+          const b=document.createElement("button");b.type="button";
+          b.className="svbtn"+(i===selSv?" on":"");
+          b.innerHTML='<span class="svl"></span>'+(s.l.indexOf("(")<0?'<span class="svg">'+fmtAmt(s.g)+' '+f.unit+'</span>':'');
+          b.querySelector(".svl").textContent=s.l;
+          b.onclick=()=>{selSv=i;renderQtyUI();updateSheetMacros();};
+          presets.appendChild(b);
+        });
+      }
+      stepper.style.display = qtyMode==="exact" ? "" : "none";
+    }
+  }
   function openSheet(f,amt,mode){
     sheetFood=f; sheetMode=mode||"log";
     $("sTitle").textContent=f.n;
     $("sHint").textContent=f.hint||"";
-    $("sUnit").textContent=f.unit;
-    $("sAmt").value=fmtAmt(amt!=null?amt:f.def);
+    const prov=$("sProv");
+    if(prov){prov.textContent=VER_LABEL[f.ver]||"";prov.className="prov"+(f.ver==="label"?" strong":"");}
+    // presets by default; a passed-in amount (recommender) opens exact at that value
+    if(f.countBased){qtyMode="exact";$("sAmt").value=fmtAmt(amt!=null?amt:f.def);}
+    else if(amt!=null){qtyMode="exact";$("sAmt").value=fmtAmt(amt);}
+    else{
+      qtyMode="sv";selSv=Math.max(0,f.sv.findIndex(s=>s.d));
+      $("sAmt").value=fmtAmt(defAmt(f));
+    }
     $("delFood").style.display=(f.mine&&sheetMode==="log")?"block":"none";
     const segEl=$("sSeg"); if(segEl) segEl.style.display = sheetMode==="meal" ? "none" : "grid";
     $("sAdd").textContent = sheetMode==="meal" ? "Add to meal" : "Add to today";
@@ -325,16 +455,17 @@
     $("sheet").classList.toggle("stacked", sheetMode==="meal");
     $("sheetBack").classList.toggle("stacked", sheetMode==="meal");
     setSeg(guessMeal());
+    renderQtyUI();
     updateSheetMacros();
     showSheet("sheet","sheetBack");
   }
   function closeSheet(){hideSheet("sheet","sheetBack");sheetFood=null;}
   function updateSheetMacros(){
     if(!sheetFood)return;
-    const a=parseFloat($("sAmt").value)||0, per=sheetFood.per;
-    $("sMacros").innerHTML='<span class="pm">'+nice(per.p*a)+'g P</span><span>'+Math.round(per.k*a)+
-      ' kcal</span><span>F '+nice(per.f*a)+'</span><span>C '+nice(per.c*a)+'</span>'+
-      ((per.fib||0)>0?'<span>Fib '+nice(per.fib*a)+'</span>':'');
+    const m=macrosFor(sheetFood,currentAmt());
+    $("sMacros").innerHTML='<span class="pm">'+nice(m.p)+'g P</span><span>'+Math.round(m.k)+
+      ' kcal</span><span>F '+nice(m.f)+'</span><span>C '+nice(m.c)+'</span>'+
+      (m.fib>0?'<span>Fib '+nice(m.fib)+'</span>':'');
   }
   function stepSheet(dir){
     if(!sheetFood)return;
@@ -342,6 +473,12 @@
     a=Math.max(0,Math.round((a+dir*sheetFood.step)*100)/100);
     $("sAmt").value=fmtAmt(a);updateSheetMacros();
   }
+  bind("sQMode","click",e=>{
+    const b=e.target.closest("button"); if(!b||!sheetFood||sheetFood.countBased)return;
+    if(b.dataset.q==="exact") $("sAmt").value=fmtAmt(currentAmt());   // carry the preset over
+    qtyMode=b.dataset.q;
+    renderQtyUI();updateSheetMacros();
+  });
   $("sMinus").onclick=()=>stepSheet(-1);
   $("sPlus").onclick=()=>stepSheet(1);
   $("sAmt").oninput=updateSheetMacros;
@@ -351,21 +488,28 @@
   $("sSeg").querySelectorAll("button").forEach(b=>b.onclick=()=>setSeg(b.dataset.m));
   $("sAdd").onclick=()=>{
     if(!sheetFood)return;
-    const a=parseFloat($("sAmt").value)||0;
+    const a=currentAmt();
     if(a<=0){toast("Set an amount above 0");return;}
-    const per=sheetFood.per, fname=sheetFood.n, funit=sheetFood.unit;
+    const m=macrosFor(sheetFood,a), fname=sheetFood.n, funit=sheetFood.unit;
+    // human label when a preset was used and it says more than the raw amount
+    let lbl=null;
+    if(qtyMode==="sv"&&!sheetFood.countBased){
+      const s=sheetFood.sv[selSv];
+      if(s&&!/^[\d.½]+ ?(g|ml)/.test(s.l))
+        lbl = /\(\d+(\.\d+)? ?(g|ml)\)/.test(s.l) ? s.l : s.l+" · "+fmtAmt(a)+" "+funit;
+    }
     if(sheetMode==="meal"){
       if(!draft){closeSheet();return;}
-      draft.items.push({n:fname,amt:a,unit:funit,
-        p:per.p*a,f:per.f*a,c:per.c*a,k:per.k*a,fib:(per.fib||0)*a});
+      draft.items.push({n:fname,amt:a,unit:funit,lbl:lbl,
+        p:m.p,f:m.f,c:m.c,k:m.k,fib:m.fib});
       renderDraft();closeSheet();   // note: closeSheet() nulls sheetFood, so read it before here
       const se=$("mbSearch"); if(se){se.value="";renderPicker("");}
       toast(fname+" added to the meal");
       return;
     }
-    addEntry({n:sheetFood.n,amt:a,unit:sheetFood.unit,meal:sheetMeal,p:per.p*a,f:per.f*a,c:per.c*a,k:per.k*a,fib:(per.fib||0)*a});
-    taps[sheetFood.n]=(taps[sheetFood.n]||0)+1; saveTaps(); renderFavs();
-    toast("+"+nice(round(per.p*a))+" g protein · "+sheetMeal);
+    addEntry({n:fname,amt:a,unit:funit,lbl:lbl,meal:sheetMeal,p:m.p,f:m.f,c:m.c,k:m.k,fib:m.fib});
+    taps[fname]=(taps[fname]||0)+1; saveTaps(); renderFavs();
+    toast("+"+nice(round(m.p))+" g protein · "+sheetMeal);
     closeSheet();
   };
   $("delFood").onclick=()=>{
@@ -425,8 +569,8 @@
     if(amt<=0){toast("Enter the amount those macros are for");return;}
     if(!p&&!k){toast("Enter at least protein or calories");return;}
     if(FOODS.some(x=>x.n.toLowerCase()===name.toLowerCase())){toast("A food with that name exists");return;}
-    customFoods.push({n:name,cat:"My foods",unit:unit,def:amt,step:(amt>=20?5:(amt>=5?1:0.5)),
-      per:{p:p/amt,f:f/amt,c:c/amt,k:k/amt,fib:fib/amt}});
+    customFoods.push(migrateCustom({n:name,cat:"My foods",unit:unit,def:amt,step:(amt>=20?5:(amt>=5?1:0.5)),
+      per:{p:p/amt,f:f/amt,c:c/amt,k:k/amt,fib:fib/amt}}));
     saveCustom();rebuildFoods();
     ["cfName","cfUnit","cfAmt","cfP","cfK","cfF","cfC","cfFib"].forEach(i=>{const el=$(i);if(el)el.value="";});
     document.querySelector(".addfood").open=false;
@@ -473,12 +617,14 @@
     if(prevSlice.length<3){t.innerHTML="Building your baseline — <b>"+cur.toFixed(1)+" kg</b> average so far. A second week makes the trend readable.";return;}
     const prev=prevSlice.reduce((a,w)=>a+w.kg,0)/prevSlice.length;
     const diff=cur-prev;
+    /* Rate vs the 0.3–0.5 kg/week goal only — no prescriptions.
+       Adjustment calls belong to the weekly coaching review, not this app. */
     let verdict;
-    if(diff<=-0.7) verdict='<span class="warn">Faster than ideal</span> — that pace risks muscle. Consider adding ~150 kcal back.';
-    else if(diff<=-0.25) verdict='<span class="good">On target</span> — this is the 0.3–0.5 kg/week range you want.';
-    else if(diff<=-0.05) verdict='Slightly slow but moving. Give it another week before changing anything.';
-    else if(diff<0.25) verdict='Flat. If this holds 2–3 weeks, add ~1,500 steps/day before cutting food.';
-    else verdict='<span class="warn">Trending up.</span> Worth checking your logging is complete before adjusting.';
+    if(diff<=-0.7) verdict='<span class="warn">Faster than the 0.3–0.5 kg/week goal.</span>';
+    else if(diff<=-0.25) verdict='<span class="good">On pace</span> — inside the 0.3–0.5 kg/week goal.';
+    else if(diff<=-0.05) verdict='Losing, but slower than the 0.3–0.5 kg/week goal.';
+    else if(diff<0.25) verdict='Flat week on week.';
+    else verdict='<span class="warn">Up week on week.</span>';
     t.innerHTML='Week on week: <b>'+(diff>0?"+":"")+diff.toFixed(2)+' kg</b> ('+prev.toFixed(1)+' → '+cur.toFixed(1)+' kg). '+verdict;
   }
   $("wtAdd").onclick=()=>{
@@ -489,6 +635,28 @@
     weights.sort((a,b)=>a.d<b.d?-1:1);
     saveWeights();renderWeight();toast(ex?"Weight updated":"Weight logged");
   };
+
+  /* ---------- waist (weekly, feeds the coaching export) ---------- */
+  function daysBetween(isoOrKey){
+    const d=new Date(isoOrKey); if(isNaN(d))return null;
+    return Math.floor((Date.now()-d.getTime())/86400000);
+  }
+  function renderWaist(){
+    const line=$("waLast"); if(!line)return;
+    if(!waist.length){line.textContent="Once a week is plenty — it rides along in the export.";return;}
+    const last=waist[waist.length-1];
+    const days=daysBetween(last.d);
+    line.innerHTML='Last: <b>'+last.cm.toFixed(1)+' cm</b> · '+prettyDate(keyToDate(last.d))+
+      (days>=7?' — due for a fresh one':'');
+  }
+  bind("waAdd","click",()=>{
+    const cm=parseFloat($("waIn").value);
+    if(!cm||cm<40||cm>200){toast("Enter a waist in cm");return;}
+    const ex=waist.find(w=>w.d===dateKey);
+    if(ex)ex.cm=cm; else waist.push({d:dateKey,cm:cm});
+    waist.sort((a,b)=>a.d<b.d?-1:1);
+    saveWaist();$("waIn").value="";renderWaist();toast(ex?"Waist updated":"Waist logged");
+  });
 
   /* ---------- 7-day strip (tappable) ---------- */
   function renderWeek(){
@@ -545,12 +713,39 @@
     });
   }
 
-  /* ---------- settings ---------- */
+  /* ---------- settings + coach check-in ---------- */
+  /* pt:targetlog: [{d: ISO, targets:{p,k,f,c,fib}}] — appended on every coach
+     update and carried in the export, so the coach sees when changes took effect */
+  function saveTargetlog(){lsSet("pt:targetlog",targetlog);}
+  function deltaChipsHtml(oldT,newT){
+    const KEYS=[["k","kcal"],["p","P"],["f","F"],["c","C"],["fib","Fib"]];
+    return KEYS.map(([key,lbl])=>{
+      const o=oldT[key],n=newT[key];
+      return '<span>'+lbl+' '+o+(o===n?' =':' → <b>'+n+'</b>')+'</span>';
+    }).join("");
+  }
+  function renderCoachLine(){
+    const line=$("coachLine"),chips=$("coachChips");
+    if(!line)return;
+    const bits=[];
+    if(targetlog.length){
+      const d=daysBetween(targetlog[targetlog.length-1].d);
+      bits.push("Targets last updated "+(d===0?"today":d+" day"+(d===1?"":"s")+" ago"));
+    } else bits.push("No coach update recorded yet");
+    const le=lsGet("pt:lastexport",null);
+    if(le){const d=daysBetween(le);bits.push("export sent "+(d===0?"today":d+" day"+(d===1?"":"s")+" ago"));}
+    line.textContent=bits.join(" · ");
+    if(chips){
+      chips.innerHTML="";
+      if(targetlog.length>=2)
+        chips.innerHTML=deltaChipsHtml(targetlog[targetlog.length-2].targets,targetlog[targetlog.length-1].targets);
+    }
+  }
   function openSettings(){
-    $("tP").value=targets.p;$("tK").value=targets.k;$("tF").value=targets.f;$("tC").value=targets.c;
-    const tf=$("tFib"); if(tf) tf.value=targets.fib;
+    renderCoachLine();
     const days=allLogKeys().length;
-    $("statLine").textContent=days+" day"+(days===1?"":"s")+" logged · "+customFoods.length+" custom food"+(customFoods.length===1?"":"s")+" · "+meals.length+" meal"+(meals.length===1?"":"s")+" · "+weights.length+" weigh-in"+(weights.length===1?"":"s");
+    $("statLine").textContent=days+" day"+(days===1?"":"s")+" logged · "+customFoods.length+" custom food"+(customFoods.length===1?"":"s")+" · "+meals.length+" meal"+(meals.length===1?"":"s")+" · "+weights.length+" weigh-in"+(weights.length===1?"":"s")+" · "+waist.length+" waist";
+    const sl=$("storageLine"); if(sl) sl.textContent=storageLineText();
     showSheet("setSheet","setBack");
   }
   function closeSettings(){hideSheet("setSheet","setBack");}
@@ -558,15 +753,42 @@
   $("btnSet").onclick=openSettings;
   $("setCancel").onclick=closeSettings;
   $("setBack").onclick=closeSettings;
-  $("setSave").onclick=()=>{
-    const p=parseFloat($("tP").value),k=parseFloat($("tK").value),f=parseFloat($("tF").value),c=parseFloat($("tC").value);
-    if(!(p>0&&k>0)){toast("Protein and calories must be above 0");return;}
-    if(p>400||k>8000){toast("That looks out of range — check the numbers");return;}
-    const fibv=parseFloat(($("tFib")||{}).value);
-    targets={p:Math.round(p),k:Math.round(k),f:Math.round(f)||0,c:Math.round(c)||0,
-             fib:Math.round(fibv)||DEFAULT_TARGETS.fib};
-    saveTargets();planRendered=false;render();renderWeek();closeSettings();toast("Targets updated");
-  };
+
+  function readCoachInputs(){
+    return {p:parseFloat($("tP").value),k:parseFloat($("tK").value),
+            f:parseFloat($("tF").value),c:parseFloat($("tC").value),
+            fib:parseFloat(($("tFib")||{}).value)};
+  }
+  function renderDeltaChips(){
+    const el=$("deltaChips"); if(!el)return;
+    const v=readCoachInputs();
+    const nt={p:Math.round(v.p)||0,k:Math.round(v.k)||0,f:Math.round(v.f)||0,c:Math.round(v.c)||0,fib:Math.round(v.fib)||0};
+    el.innerHTML=deltaChipsHtml(targets,nt);
+  }
+  function openCoach(){
+    $("tP").value=targets.p;$("tK").value=targets.k;$("tF").value=targets.f;$("tC").value=targets.c;
+    const tf=$("tFib"); if(tf) tf.value=targets.fib;
+    renderDeltaChips();
+    showSheet("coachSheet","coachBack");
+  }
+  function closeCoach(){hideSheet("coachSheet","coachBack");}
+  makeDraggable("coachSheet",closeCoach);
+  bind("coachBtn","click",openCoach);
+  bind("coachCancel","click",closeCoach);
+  bind("coachBack","click",closeCoach);
+  ["tP","tK","tF","tC","tFib"].forEach(id=>bind(id,"input",renderDeltaChips));
+  bind("coachSave","click",()=>{
+    const v=readCoachInputs();
+    if(!(v.p>0&&v.k>0)){toast("Protein and calories must be above 0");return;}
+    if(v.p>400||v.k>8000){toast("That looks out of range — check the numbers");return;}
+    const nt={p:Math.round(v.p),k:Math.round(v.k),f:Math.round(v.f)||0,c:Math.round(v.c)||0,
+              fib:Math.round(v.fib)||DEFAULT_TARGETS.fib};
+    const changed=JSON.stringify(nt)!==JSON.stringify(targets);
+    targets=nt;saveTargets();
+    if(changed){targetlog.push({d:new Date().toISOString(),targets:nt});saveTargetlog();}
+    planRendered=false;render();renderWeek();renderCoachLine();closeCoach();
+    toast(changed?"Targets updated from coach":"Targets unchanged");
+  });
 
   /* ---------- export / import ---------- */
   function download(name,text,type){
@@ -575,16 +797,38 @@
     const a=document.createElement("a");a.href=url;a.download=name;document.body.appendChild(a);a.click();
     setTimeout(()=>{URL.revokeObjectURL(url);a.remove();},400);
   }
+  /* The JSON export is an interface, not a backup: it feeds the weekly
+     coaching review that produces new pt:targets. Always full history,
+     never deltas. Schema history: 3 = v1 backup; 4 = adds schema field,
+     waist series. Import accepts 3 and 4. */
   function collectAll(){
     const logs={};
     allLogKeys().forEach(k=>{logs[k.replace("pt:log:","")]=lsGet(k,[]);});
     logs[dateKey]=entries;
-    return {app:"protein-tracker",version:3,exported:new Date().toISOString(),targets,customFoods,meals,weights,taps,logs};
+    return {app:"protein-tracker",version:4,schema:4,exported:new Date().toISOString(),
+            targets,targetlog,customFoods,meals,weights,waist,taps,logs};
   }
-  $("expJson").onclick=()=>{
-    download("protein-tracker-backup-"+dateKey+".json",JSON.stringify(collectAll(),null,2),"application/json");
-    toast("Backup downloaded");
-  };
+  function markExported(){
+    lsSet("pt:lastexport",new Date().toISOString());
+    try{localStorage.removeItem("pt:nudgesnooze");}catch(e){}
+    renderNudge();
+  }
+  async function shareExport(){
+    const json=JSON.stringify(collectAll(),null,2);
+    const name="protein-tracker-export-"+dateKey+".json";
+    try{
+      const file=new File([json],name,{type:"application/json"});
+      if(navigator.share&&navigator.canShare&&navigator.canShare({files:[file]})){
+        await navigator.share({files:[file],title:"Protein Tracker export"});
+        markExported();toast("Export shared");return;
+      }
+    }catch(err){
+      if(err&&err.name==="AbortError")return;   // user closed the share sheet — not an export
+    }
+    download(name,json,"application/json");
+    markExported();toast("Export downloaded");
+  }
+  bind("expJson","click",shareExport);
   $("expCsv").onclick=()=>{
     const data=collectAll();
     const esc=v=>{v=String(v==null?"":v);return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
@@ -618,6 +862,8 @@
         if(d.customFoods)lsSet("pt:customfoods",d.customFoods);
         if(d.meals)lsSet("pt:meals",d.meals);
         if(d.weights)lsSet("pt:weights",d.weights);
+        if(d.waist)lsSet("pt:waist",d.waist);   // absent in schema-3 backups — fine
+        if(d.targetlog)lsSet("pt:targetlog",d.targetlog);
         if(d.taps)lsSet("pt:taps",d.taps);
         toast("Backup restored");
         setTimeout(()=>location.reload(),700);
@@ -626,6 +872,63 @@
     r.readAsText(file);
     this.value="";
   };
+
+  /* ---------- durability (localStorage stays the source of truth;
+     this is about not losing it, not about sync) ---------- */
+  const storageState={persist:null,usage:null,quota:null};
+  function fmtBytes(n){
+    if(n==null)return "?";
+    if(n<1024*1024)return Math.max(1,Math.round(n/1024))+" KB";
+    if(n<1024*1024*1024)return (n/1048576).toFixed(1)+" MB";
+    return (n/1073741824).toFixed(1)+" GB";
+  }
+  function storageLineText(){
+    let bits=[];
+    if(storageState.persist===true) bits.push("Persistent storage: granted — the browser won't evict this app's data under pressure.");
+    else if(storageState.persist===false) bits.push("Persistent storage: not granted — keep exporting; the browser may evict data under storage pressure.");
+    else bits.push("Persistent storage: unknown on this browser.");
+    if(storageState.quota) bits.push("Using "+fmtBytes(storageState.usage)+" of "+fmtBytes(storageState.quota)+".");
+    const last=lsGet("pt:lastexport",null);
+    if(last){const d=daysBetween(last);bits.push("Last export: "+(d===0?"today":d+" day"+(d===1?"":"s")+" ago")+".");}
+    else bits.push("Last export: never.");
+    return bits.join(" ");
+  }
+  function initDurability(){
+    if(navigator.storage&&navigator.storage.persist){
+      navigator.storage.persisted()
+        .then(p=>p?true:navigator.storage.persist())
+        .then(g=>{storageState.persist=!!g;})
+        .catch(()=>{});
+    }
+    if(navigator.storage&&navigator.storage.estimate){
+      navigator.storage.estimate().then(e=>{
+        storageState.usage=e.usage;storageState.quota=e.quota;
+        if(e.quota&&e.usage/e.quota>0.8) toast("Storage almost full — export your data");
+      }).catch(()=>{});
+    }
+  }
+
+  /* ---------- days-since-export nudge (dismiss = snooze, it comes back) ---------- */
+  const NUDGE_AFTER_DAYS=7, NUDGE_SNOOZE_DAYS=3, NUDGE_MIN_LOGGED_DAYS=3;
+  function renderNudge(){
+    const el=$("nudge"); if(!el)return;
+    const last=lsGet("pt:lastexport",null);
+    const snooze=lsGet("pt:nudgesnooze",null);
+    let msg=null;
+    if(last){
+      const d=daysBetween(last);
+      if(d!=null&&d>=NUDGE_AFTER_DAYS) msg="Last export was "+d+" days ago — the coach review needs fresh data.";
+    } else if(allLogKeys().length>=NUDGE_MIN_LOGGED_DAYS){
+      msg="You've never exported — the weekly coach review runs on the JSON export.";
+    }
+    if(msg&&snooze!=null){const s=daysBetween(snooze);if(s!=null&&s<NUDGE_SNOOZE_DAYS)msg=null;}
+    if(!msg){el.hidden=true;el.innerHTML="";return;}
+    el.hidden=false;
+    el.innerHTML='<span class="ntxt"></span><span class="nacts"><button class="ngo">Export</button><button class="nlater">Later</button></span>';
+    el.querySelector(".ntxt").textContent=msg;
+    el.querySelector(".ngo").onclick=shareExport;
+    el.querySelector(".nlater").onclick=()=>{lsSet("pt:nudgesnooze",new Date().toISOString());renderNudge();};
+  }
 
   /* ---------- appbar ---------- */
   window.addEventListener("scroll",()=>{$("appbar").classList.toggle("scrolled",window.scrollY>8);},{passive:true});
@@ -674,7 +977,7 @@
   function loadMeals(){meals=lsGet("pt:meals",[]);}
   function saveMeals(){lsSet("pt:meals",meals);}
   function mealTotals(m){return sumOf(m.items||[]);}
-  function ingLine(m){return (m.items||[]).map(i=>i.n+" "+fmtAmt(i.amt)+i.unit).join(" · ");}
+  function ingLine(m){return (m.items||[]).map(i=>i.n+" "+(i.lbl||fmtAmt(i.amt)+i.unit)).join(" · ");}
 
   function renderMeals(){
     const wrap=$("mealList"); if(!wrap)return;
@@ -740,7 +1043,7 @@
     } else {
       draft.items.forEach((it,idx)=>{
         const r=document.createElement("div");r.className="mbrow";
-        r.innerHTML='<span class="mbn"></span><span class="mba">'+fmtAmt(it.amt)+' '+it.unit+' · '+nice(round(it.p))+'g P</span>'+
+        r.innerHTML='<span class="mbn"></span><span class="mba">'+esc(it.lbl||fmtAmt(it.amt)+' '+it.unit)+' · '+nice(round(it.p))+'g P</span>'+
           '<button class="mbx" aria-label="Remove">×</button>';
         r.querySelector(".mbn").textContent=it.n;
         r.querySelector(".mbx").onclick=()=>{draft.items.splice(idx,1);renderDraft();};
@@ -757,11 +1060,13 @@
     const wrap=$("mbPick");wrap.innerHTML="";
     if(!filter){wrap.innerHTML='';return;}
     FOODS.filter(f=>f.n.toLowerCase().includes(filter)).slice(0,12).forEach(f=>{
-      const b=document.createElement("button");b.className="chip";b.type="button";
-      b.innerHTML='<div class="nm"></div><div class="mac"><b>'+nice(f.per.p*f.def)+'g P</b> / '+fmtAmt(f.def)+f.unit+'</div>';
-      b.querySelector(".nm").textContent=f.n;
-      b.onclick=()=>openSheet(f,null,"meal");
-      wrap.appendChild(b);
+      const d=document.createElement("div");d.className="chip";
+      const ds=defServing(f), dm=macrosFor(f,ds.g);
+      d.innerHTML='<button class="cmain" type="button"><div class="nm"></div>'+
+        '<div class="mac"><b>'+nice(round(dm.p))+'g P</b> / '+ds.l+'</div></button>';
+      d.querySelector(".nm").textContent=f.n;
+      d.querySelector(".cmain").onclick=()=>openSheet(f,null,"meal");
+      wrap.appendChild(d);
     });
     if(!wrap.children.length) wrap.innerHTML='<div class="empty" style="grid-column:1/-1;padding:12px">Nothing matches. Save it under My foods on the Today tab first.</div>';
   }
@@ -794,89 +1099,152 @@
     saveMeals();closeBuilder();renderMeals();renderFavs();toast('"'+name+'" saved');
   });
 
-  /* ================= PLAN ================= */
+  /* ================= PLAN (data-driven from plan.js) =================
+     Every macro shown here is recomputed live from the food DB — the plan
+     document's own claimed numbers are never rendered. Estimated (unlinked)
+     items are marked "est". */
   let planRendered=false;
-  function mdInline(t){
-    return t.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
-      .replace(/`([^`]+)`/g,"<code>$1</code>")
-      .replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>")
-      .replace(/(^|[^*])\*([^*]+)\*/g,"$1<em>$2</em>");
+  const PLAN=window.MEAL_PLAN||null;
+
+  function planItemMacros(it){
+    if(it.est) return it.est;
+    const f=findFood(it.food);
+    if(!f){warn("plan item not in food DB: "+it.food);return null;}
+    return macrosFor(f,it.amt);          // plan amounts are grams/ml
   }
-  function mdBlocks(lines){
-    let html="",i=0;
-    while(i<lines.length){
-      const l=lines[i];
-      if(/^\s*$/.test(l)){i++;continue;}
-      if(/^---+$/.test(l.trim())){html+="<hr>";i++;continue;}
-      if(/^### /.test(l)){html+="<h3>"+mdInline(l.slice(4))+"</h3>";i++;continue;}
-      if(/^\|/.test(l)){                                    // table
-        const rows=[];
-        while(i<lines.length&&/^\|/.test(lines[i])){rows.push(lines[i]);i++;}
-        const cells=r=>r.trim().replace(/^\||\|$/g,"").split("|").map(c=>c.trim());
-        const head=cells(rows[0]);
-        const body=rows.slice(rows.length>1&&/^\|[\s\-:|]+\|?$/.test(rows[1])?2:1);
-        html+='<div class="tablewrap"><table><thead><tr>'+head.map(h=>"<th>"+mdInline(h)+"</th>").join("")+
-              "</tr></thead><tbody>"+body.map(r=>"<tr>"+cells(r).map(c=>"<td>"+mdInline(c)+"</td>").join("")+"</tr>").join("")+
-              "</tbody></table></div>";
-        if(head.length>2) html+='<div class="scrollhint">swipe table sideways →</div>';
-        continue;
-      }
-      if(/^> /.test(l)){
-        const buf=[];
-        while(i<lines.length&&/^>/.test(lines[i])){buf.push(lines[i].replace(/^>\s?/,""));i++;}
-        html+="<blockquote>"+mdBlocks(buf)+"</blockquote>";continue;
-      }
-      if(/^[-*] /.test(l)){
-        const buf=[];
-        while(i<lines.length&&/^[-*] /.test(lines[i])){buf.push(lines[i].replace(/^[-*] /,""));i++;}
-        html+="<ul>"+buf.map(b=>"<li>"+mdInline(b)+"</li>").join("")+"</ul>";continue;
-      }
-      const para=[];
-      while(i<lines.length&&!/^\s*$/.test(lines[i])&&!/^[|>#-]/.test(lines[i])){para.push(lines[i]);i++;}
-      if(para.length) html+="<p>"+mdInline(para.join(" "))+"</p>";
-      else i++;
-    }
-    return html;
+  function planSum(items){
+    const t={p:0,f:0,c:0,k:0,fib:0,est:false};
+    (items||[]).forEach(it=>{
+      const m=planItemMacros(it); if(!m)return;
+      t.p+=m.p;t.f+=m.f;t.c+=m.c;t.k+=m.k;t.fib+=m.fib;
+      if(it.est)t.est=true;
+    });
+    return t;
+  }
+  function planItemLabel(it){
+    if(!it.food) return it.name+(it.note?" ("+it.note+")":"");
+    const f=findFood(it.food);
+    let s=fmtAmt(it.amt)+" "+(f?f.unit:"g")+" "+it.food;
+    if(it.note)s+=" ("+it.note+")";
+    return s;
+  }
+  function macLine(t,withFib){
+    return '<b>'+nice(round(t.p))+'g P</b> · '+Math.round(t.k)+' kcal · F '+nice(round(t.f))+
+      ' · C '+Math.round(t.c)+(withFib!==false?' · Fib '+nice(round(t.fib)):'')+
+      (t.est?' <span class="est">est</span>':'');
+  }
+  function esc(s){return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+  function optionCard(o){
+    const t=planSum(o.items);
+    let h='<div class="popt"><div class="poh"><span class="potag">'+esc(o.tag)+'</span>'+
+      '<span class="ponm">'+esc(o.name)+'</span></div>'+
+      (o.hint?'<div class="pohint">'+esc(o.hint)+'</div>':'')+
+      '<div class="pomac">'+macLine(t)+'</div><ul class="poing">';
+    o.items.forEach(it=>{h+='<li'+(it.unlinked?' class="unlinked"':'')+'>'+esc(planItemLabel(it))+(it.unlinked?' <span class="est">est</span>':'')+'</li>';});
+    (o.extras||[]).forEach(x=>{h+='<li class="extra">'+esc(x)+'</li>';});
+    h+='</ul><div class="pomethod">'+esc(o.method)+'</div></div>';
+    return h;
+  }
+  function slotTotals(slotName,optIdx){
+    if(slotName==="pregym") return planSum(PLAN.pregym.items);
+    const s=PLAN.slots.find(x=>x.slot===slotName);
+    return s?planSum(s.options[optIdx||0].items):{p:0,f:0,c:0,k:0,fib:0};
+  }
+  function accSection(title,html,open){
+    return '<details class="acc"'+(open?' open':'')+'><summary><span class="ttl">'+esc(title)+'</span>'+
+      '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>'+
+      '<div class="accbody">'+html+'</div></details>';
   }
   function renderPlan(){
     if(planRendered)return;
-    const src=$("planDoc"); if(!src)return;
-    const md=src.textContent.trim().split("\n");
-    // overview card
-    $("planOverview").innerHTML=
-      '<div class="planhero"><h2>Your fat-loss plan</h2>'+
+    const ov=$("planOverview"),body=$("planBody");
+    if(!ov||!body)return;
+    if(!PLAN){body.innerHTML='<div class="empty">Plan data failed to load — fully close and reopen the app.</div>';return;}
+    // overview: live targets only — they come from the weekly coaching review
+    ov.innerHTML=
+      '<div class="planhero"><h2>Your plan</h2>'+
       '<div class="plangrid">'+
         '<div><div class="pk">Protein</div><div class="pv hero">'+targets.p+' g</div></div>'+
         '<div><div class="pk">Calories</div><div class="pv">'+targets.k+'</div></div>'+
         '<div><div class="pk">Fat</div><div class="pv">'+targets.f+' g</div></div>'+
         '<div><div class="pk">Carbs</div><div class="pv">'+targets.c+' g</div></div>'+
         '<div><div class="pk">Fibre</div><div class="pv">'+targets.fib+' g</div></div>'+
-        '<div><div class="pk">Deficit</div><div class="pv">−500</div></div>'+
+        '<div><div class="pk">Pace goal</div><div class="pv">0.3–0.5</div></div>'+
       '</div>'+
-      '<p class="pnote">TDEE ≈ 2,475 kcal (76 kg · 174 cm · 31 · male, verified against your watch data) minus a 500 kcal deficit. Aim to lose 0.3–0.5 kg/week.</p></div>';
-    // split into ## sections -> accordions
-    const body=$("planBody");body.innerHTML="";
+      '<p class="pnote">Targets come from the weekly coaching review — update them in Settings after each check-in. Pace goal is kg lost per week (7-day average).</p>'+
+      '<div class="nn"><b>Non-negotiables:</b> hit protein (within ~'+PLAN.nonNegotiables.proteinBand+
+      ' g of your '+targets.p+' g target) and calories every day. '+esc(PLAN.nonNegotiables.flex)+' '+
+      esc(PLAN.nonNegotiables.safetyNet)+'</div></div>';
+
     const doc=document.createElement("div");doc.className="pdoc";
-    let intro=[],sections=[],cur=null;
-    md.forEach(line=>{
-      if(/^## /.test(line)){cur={title:line.slice(3).trim(),lines:[]};sections.push(cur);}
-      else if(/^# /.test(line)){/* title — shown in the hero card */}
-      else if(cur) cur.lines.push(line);
-      else intro.push(line);
+    let html="";
+
+    // the daily shape
+    const pre=planSum(PLAN.pregym.items);
+    let shapeHtml='<div class="tablewrap"><table class="tight"><thead><tr><th>Time</th><th>Slot</th></tr></thead><tbody>'+
+      '<tr><td>'+esc(PLAN.pregym.time)+'</td><td><b>'+esc(PLAN.pregym.label)+'</b> (fixed) — '+
+      esc(PLAN.pregym.items.map(planItemLabel).join(" + "))+' + black coffee → '+macLine(pre,false)+'</td></tr>';
+    PLAN.slots.forEach(s=>{
+      shapeHtml+='<tr><td>'+esc(s.time)+'</td><td><b>'+esc(s.slot)+'</b>'+(s.optional?' <i>(optional)</i>':'')+
+        ' — '+esc(s.role)+'</td></tr>';
     });
-    if(intro.join("").trim()){
-      const d=document.createElement("div");d.innerHTML=mdBlocks(intro);doc.appendChild(d);
-    }
-    sections.forEach((sec,idx)=>{
-      const acc=document.createElement("details");acc.className="acc";acc.open=(idx===0);
-      acc.innerHTML='<summary><span class="ttl"></span>'+
-        '<svg class="chev" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>'+
-        '<div class="accbody"></div>';
-      acc.querySelector(".ttl").textContent=sec.title;
-      acc.querySelector(".accbody").innerHTML=mdBlocks(sec.lines);
-      doc.appendChild(acc);
+    shapeHtml+='</tbody></table></div><p>'+esc(PLAN.breakfastNote)+'</p>';
+    html+=accSection("The daily shape",shapeHtml,true);
+
+    // each meal slot with A/B options
+    PLAN.slots.forEach(s=>{
+      let inner='<div class="porole">'+esc(s.role)+'</div>';
+      s.options.forEach(o=>{inner+=optionCard(o);});
+      html+=accSection(s.slot+(s.optional?" (optional)":""),inner,false);
     });
-    body.appendChild(doc);
+
+    // day shapes with computed totals
+    let shapes='';
+    const base=PLAN.shapes.find(x=>x.base);
+    const baseRows=base.sequence.map(sl=>{
+      const t=slotTotals(sl,0);
+      const label= sl==="pregym" ? PLAN.pregym.label : sl+" A";
+      return {label,t};
+    });
+    const baseTotal=baseRows.reduce((a,r)=>{a.p+=r.t.p;a.f+=r.t.f;a.c+=r.t.c;a.k+=r.t.k;a.fib+=r.t.fib;return a;},{p:0,f:0,c:0,k:0,fib:0});
+    shapes+='<h3>'+esc(base.name)+' — the base plan</h3><div class="tablewrap"><table class="tight"><thead><tr><th></th><th>kcal</th><th>P</th><th>F</th><th>C</th><th>Fib</th></tr></thead><tbody>';
+    baseRows.forEach(r=>{
+      shapes+='<tr><td>'+esc(r.label)+'</td><td>'+Math.round(r.t.k)+'</td><td>'+nice(round(r.t.p))+'</td><td>'+nice(round(r.t.f))+'</td><td>'+Math.round(r.t.c)+'</td><td>'+nice(round(r.t.fib))+'</td></tr>';
+    });
+    shapes+='<tr class="tot"><td><b>Total</b></td><td><b>'+Math.round(baseTotal.k)+'</b></td><td><b>'+nice(round(baseTotal.p))+'</b></td><td><b>'+nice(round(baseTotal.f))+'</b></td><td><b>'+Math.round(baseTotal.c)+'</b></td><td><b>'+nice(round(baseTotal.fib))+'</b></td></tr>'+
+      '</tbody></table></div><p class="pnote">All-A day, computed from your food DB. Rotate any meal to its B option — the roles match; Dinner B runs ~26 g protein higher for days breakfast or lunch ran low.</p>';
+    PLAN.shapes.filter(x=>!x.base).forEach(sh=>{
+      shapes+='<h3>'+esc(sh.name)+'</h3><p>'+esc(sh.adjustment?sh.adjustment.text:sh.text)+'</p>';
+      if(sh.adjustment){
+        const at=planSum(sh.adjustment.items);
+        shapes+='<p class="pnote">The add-back: '+esc(sh.adjustment.items.map(planItemLabel).join(" + "))+' → '+macLine(at,false)+'</p>';
+      }
+    });
+    html+=accSection("Three ways to run a day",shapes,false);
+
+    // no-cook fallback
+    const nc=PLAN.nocook;
+    let ncHtml='<p>'+esc(nc.text)+'</p>';
+    const ncTotal={p:0,f:0,c:0,k:0,fib:0,est:false};
+    nc.meals.forEach(m=>{
+      const t=planSum(m.items);
+      ncTotal.p+=t.p;ncTotal.f+=t.f;ncTotal.c+=t.c;ncTotal.k+=t.k;ncTotal.fib+=t.fib;if(t.est)ncTotal.est=true;
+      ncHtml+='<div class="popt"><div class="poh"><span class="potag">'+esc(m.slot)+'</span><span class="ponm">'+esc(m.name)+'</span></div>'+
+        '<div class="pomac">'+macLine(t)+'</div><ul class="poing">'+
+        m.items.map(it=>'<li'+(it.unlinked?' class="unlinked"':'')+'>'+esc(planItemLabel(it))+(it.unlinked?' <span class="est">est</span>':'')+'</li>').join("")+
+        '</ul></div>';
+    });
+    ncHtml+='<div class="pomac" style="margin-top:10px">Day total: '+macLine(ncTotal)+'</div>'+
+      '<p class="pnote">'+esc(nc.safety)+' '+esc(nc.prep)+'</p>';
+    html+=accSection(nc.name,ncHtml,false);
+
+    // quick swaps
+    let sw='';
+    PLAN.swaps.forEach(g=>{sw+='<h3>'+esc(g.group)+'</h3><p>'+esc(g.options.join(" · "))+'</p>';});
+    html+=accSection("Quick swaps (macros stay ~same)",sw,false);
+
+    doc.innerHTML=html;
+    body.innerHTML="";body.appendChild(doc);
     planRendered=true;
   }
 
@@ -887,14 +1255,19 @@
 
   try{
     targets=Object.assign({},DEFAULT_TARGETS,lsGet("pt:targets",{}));
-    customFoods=lsGet("pt:customfoods",[]);
+    const rawCustom=lsGet("pt:customfoods",[]);
+    customFoods=rawCustom.map(migrateCustom);
+    if(JSON.stringify(customFoods)!==JSON.stringify(rawCustom)) saveCustom();  // persist v1→v2 migration once
     loadMeals();
     weights=lsGet("pt:weights",[]);
+    waist=lsGet("pt:waist",[]);
+    targetlog=lsGet("pt:targetlog",[]);
     taps=lsGet("pt:taps",{});
     entries=loadDay(dateKey);
     rebuildFoods();
     const dEl=$("date"); if(dEl) dEl.textContent=prettyDate();
-    renderChips("");renderFavs();render();renderWeight();renderWeek();
+    renderChips("");renderFavs();render();renderWeight();renderWaist();renderWeek();renderNudge();
+    initDurability();
   }catch(e){
     warn("init failed: "+e.message);
     const fl=$("foodlist");
