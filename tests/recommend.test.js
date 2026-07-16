@@ -188,6 +188,33 @@ const optTotal = (slot, tag) => planOpt(slot, tag).items.reduce((a, it) => {
   });
 }
 
+/* ---- staples outrank equally-fitting exotics ---- */
+{
+  const STAPLES = FOODS.filter(f => f.st).map(f => f.n);
+  t("staples: flags present in DB", STAPLES.length >= 9, STAPLES.length);
+  const log = [entry("Breakfast", 60, 20, 80, 800, 10)];
+  const r = recommend(log, T, PLAN, FOODS, TIME(14));
+  t("staples: first protein pick is a staple", STAPLES.indexOf(r.adhoc[0].food) >= 0, r.adhoc[0].food);
+}
+
+/* ---- fibre mode surfaces isabgol ---- */
+{
+  const log = [entry("Lunch", 160, 40, 150, 1700, 12)];   // protein done, fibre short, ~275 kcal room
+  const r = recommend(log, T, PLAN, FOODS, TIME(17));
+  t("isabgol: fibre mode active", r.adhoc.length > 0 && r.adhoc[0].mode === "fibre", r.adhoc[0] && r.adhoc[0].mode);
+  t("isabgol: appears in fibre picks", r.adhoc.some(a => /Isabgol/.test(a.food)), r.adhoc.map(a => a.food));
+}
+
+/* ---- carb top-up when only calories remain ---- */
+{
+  const log = [entry("Lunch", 160, 45, 120, 1500, 29)];   // protein + fibre done, ~475 kcal room
+  const r = recommend(log, T, PLAN, FOODS, TIME(17));
+  t("carb mode: kind protein-done", r.kind === "protein-done", r.kind);
+  t("carb mode: suggestions are carb mode", r.adhoc.length > 0 && r.adhoc[0].mode === "carb", r.adhoc[0] && r.adhoc[0].mode);
+  const CARB_STAPLES = ["Rice (cooked)", "Sweet potato / shakarkandi", "Dalia / broken wheat (cooked)"];
+  t("carb mode: a carb staple leads", CARB_STAPLES.indexOf(r.adhoc[0].food) >= 0, r.adhoc.map(a => a.food));
+}
+
 /* ---- determinism: same inputs -> same output ---- */
 {
   const log = [entry("Breakfast", 50, 15, 60, 600, 8)];

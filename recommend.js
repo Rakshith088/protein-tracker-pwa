@@ -144,40 +144,59 @@
 
   /* ad-hoc add-ons: CONTEXT §4 guardrails extended to all macros —
      real dent, <=1.5x default serving, one per category, deterministic
-     daily rotation, honest calorie flags, lean-only when the budget's gone */
+     daily rotation, honest calorie flags, lean-only when the budget's gone.
+     Foods flagged st (staples: easy to procure — chicken, eggs, whey, paneer,
+     rice, sweet potato, dalia, isabgol) outrank equally-fitting exotics;
+     fish/tofu etc. stay available, just behind. Modes by priority:
+     protein gap -> fibre gap -> carb top-up when only calories remain. */
   function adhoc(db, rem, time, logLen) {
-    var mode = rem.p > 5 ? "protein" : (rem.fib > 4 ? "fibre" : null);
+    var mode = rem.p > 5 ? "protein" : (rem.fib > 4 ? "fibre" : (rem.k > 150 ? "carb" : null));
     if (!mode) return [];
     var lean = rem.k < 60;
     var cands = db.filter(function (f) {
       var g = perGram(f);
-      if (mode === "protein") return g.p > 0 && g.k > 0 && (g.p / g.k) >= (lean ? 0.18 : 0.09);
-      return (g.fib || 0) > 0 && g.k > 0 && (g.fib / g.k) >= 0.025;
+      if (g.k <= 0) return false;
+      if (mode === "protein") return g.p > 0 && (g.p / g.k) >= (lean ? 0.18 : 0.09);
+      if (mode === "fibre") return (g.fib || 0) > 0 && (g.fib / g.k) >= 0.025;
+      return g.c > 0 && (g.c * 4 / g.k) >= 0.55;   // carb mode: mostly-carb foods
     }).map(function (f) {
       var g = perGram(f), ds = defServing(f);
-      var need = mode === "protein" ? rem.p / g.p : rem.fib / (g.fib || 1);
+      var need = mode === "protein" ? rem.p / g.p
+               : mode === "fibre" ? rem.fib / (g.fib || 1)
+               : rem.k / g.k;
       var amt = Math.min(need, ds.g * 1.5);
       var rAmt = f.countBased ? Math.max(f.step || 1, Math.round(amt)) : snap(amt, f.step);
       var m = macrosFor(f, rAmt);
-      var dent = mode === "protein"
-        ? m.p >= Math.min(10, Math.max(4, rem.p * 0.3))
-        : m.fib >= Math.min(5, Math.max(2, rem.fib * 0.4));
+      var dent = mode === "protein" ? m.p >= Math.min(10, Math.max(4, rem.p * 0.3))
+               : mode === "fibre" ? m.fib >= Math.min(5, Math.max(2, rem.fib * 0.4))
+               : m.k >= Math.min(120, Math.max(60, rem.k * 0.25));
       return {
         f: f, amt: rAmt, m: m, dent: dent,
         partial: need > ds.g * 1.5, fits: m.k <= rem.k + 40,
-        eff: mode === "protein" ? g.k / g.p : g.k / (g.fib || 1)
+        eff: mode === "protein" ? g.k / g.p : mode === "fibre" ? g.k / (g.fib || 1) : -(g.c * 4 / g.k)
       };
     }).filter(function (x) { return x.dent; });
-    cands.sort(function (a, b) { return a.fits !== b.fits ? (a.fits ? -1 : 1) : a.eff - b.eff; });
+    cands.sort(function (a, b) {
+      if (a.fits !== b.fits) return a.fits ? -1 : 1;
+      if (!!a.f.st !== !!b.f.st) return a.f.st ? -1 : 1;    // staples outrank
+      return a.eff - b.eff;
+    });
     var pool = cands.slice(0, 10);
     if (!pool.length) return [];
     var daySeed = parseInt(String(time.dateKey || "0").slice(-2).replace(/\D/g, ""), 10) || 0;
     var seed = (daySeed + (logLen || 0)) % pool.length;
     var rot = pool.slice(seed).concat(pool.slice(0, seed));
     var out = [], cats = {};
-    rot.forEach(function (s) { if (out.length < 3 && !cats[s.f.cat]) { cats[s.f.cat] = true; out.push(s); } });
+    // the best pick always leads (fit + staple + efficiency already sorted);
+    // daily rotation only diversifies the remaining slots
+    if (pool.length) { out.push(pool[0]); cats[pool[0].f.cat] = true; }
+    rot.forEach(function (s) { if (out.length < 3 && out.indexOf(s) < 0 && !cats[s.f.cat]) { cats[s.f.cat] = true; out.push(s); } });
     rot.forEach(function (s) { if (out.length < 3 && out.indexOf(s) < 0) out.push(s); });
-    out.sort(function (a, b) { return a.fits !== b.fits ? (a.fits ? -1 : 1) : a.eff - b.eff; });
+    out.sort(function (a, b) {
+      if (a.fits !== b.fits) return a.fits ? -1 : 1;
+      if (!!a.f.st !== !!b.f.st) return a.f.st ? -1 : 1;
+      return a.eff - b.eff;
+    });
     return out.map(function (s) {
       return {
         food: s.f.n, amt: s.amt, unit: s.f.unit, adds: s.m,
@@ -209,7 +228,8 @@
       return {
         kind: "protein-done", rem: rem, headline: "Protein done",
         reasoning: "About " + r0(rem.k) + " kcal of room left" +
-          (rem.fib > 4 ? ", and " + r0(rem.fib) + " g fibre still to get — fibre-dense picks below." : "."),
+          (rem.fib > 4 ? ", and " + r0(rem.fib) + " g fibre still to get — fibre-dense picks below."
+           : (rem.k > 150 ? " — easy carb top-ups below." : ".")),
         adhoc: adhoc(foodDb, rem, time, logLen)
       };
     }
