@@ -55,7 +55,7 @@ window.MEAL_PLAN = {
             { food: "Whole egg", amt: 150, note: "3 eggs" },
             { food: "Egg white", amt: 90, note: "3 whites" },
             { food: "Brown bread", amt: 60, note: "2 slices" },
-            { name: "Bhurji veg (onion/tomato/capsicum)", unlinked: true, est: { p: 1, f: 0, c: 5, k: 25, fib: 1.5 } },
+            { food: "Bhurji veg (onion/tomato/capsicum)", amt: 100, note: "1 katori raw mix" },
             { food: "Ghee / oil", amt: 5, note: "1 tsp" },
             { food: "TruNativ Raw Concentrate", amt: 17.5, note: "½ scoop in water — matches Option A's protein" }
           ],
@@ -158,7 +158,7 @@ window.MEAL_PLAN = {
         {
           id: "meal4-a", tag: "A", name: "Moong dal chilla + curd",
           items: [
-            { name: "Moong dal chilla ×2 (from ~50 g dry dal)", unlinked: true, est: { p: 12, f: 0.6, c: 31, k: 175, fib: 8 } },
+            { food: "Moong dal (dry)", amt: 50, note: "makes 2 chilla, cooked dry on non-stick" },
             { food: "Curd (regular)", amt: 100 }
           ],
           method: "Blend soaked dal to batter, cook 2 thin chilla on non-stick. Serve with curd.",
@@ -242,8 +242,8 @@ window.MEAL_PLAN = {
       {
         slot: "Dinner", name: "Dal pouch + rice + eggs",
         items: [
-          { name: "Ready dal pouch (MTR/Tasty Bite)", unlinked: true, est: { p: 13, f: 8, c: 28, k: 240, fib: 6 } },
-          { name: "Pre-cooked rice (½ pack ≈ 125 g)", unlinked: true, est: { p: 3.4, f: 0.4, c: 35, k: 163, fib: 0.5 } },
+          { name: "Ready dal pouch (MTR/Tasty Bite)", unlinked: true, est: { p: 13, f: 8, c: 28, k: 240, fib: 6 }, note: "add yours as a custom food from the pouch label" },
+          { food: "Rice (cooked)", amt: 125, note: "pre-cooked pack, ½ pack" },
           { food: "Whole egg", amt: 150, note: "3 eggs, pre-boiled" },
           { food: "Green salad (dressed)", amt: 150, note: "1 katori" }
         ],

@@ -1,7 +1,7 @@
 {
   "name": "Protein Tracker",
   "short_name": "Protein",
-  "description": "Protein-first daily macro tracker — 160 g protein, 1975 kcal.",
+  "description": "Protein-first daily macro tracker.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

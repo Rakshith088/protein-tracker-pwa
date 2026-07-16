@@ -35,7 +35,7 @@
     {n:"TruNativ Pro Blend",cat:"Protein & dairy",unit:"g",ver:"product-page",hint:"1 scoop = 36 g · 26 g protein",per100:{p:73.3,f:5.94,c:11,k:390.8,fib:0},sv:[{l:"½ scoop",g:18},{l:"1 scoop",g:36,d:1},{l:"1.5 scoop",g:54}],step:6},
     {n:"Chicken breast (cooked)",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:30,f:3.6,c:0,k:165,fib:0},sv:[{l:"100 g",g:100},{l:"150 g",g:150,d:1},{l:"200 g",g:200}],step:25},
     {n:"Fish – rohu/surmai (cooked)",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:22,f:5,c:0,k:135,fib:0},sv:[{l:"100 g",g:100},{l:"150 g",g:150,d:1},{l:"175 g",g:175}],step:25},
-    {n:"Tuna (drained)",cat:"Protein & dairy",unit:"g",ver:"reference",hint:"1 tin ≈ 100 g",per100:{p:25,f:0.8,c:0,k:116,fib:0},sv:[{l:"1 tin",g:100,d:1},{l:"½ tin",g:50}],step:20},
+    {n:"Tuna (drained)",cat:"Protein & dairy",unit:"g",ver:"reference",hint:"1 tin ≈ 100 g",per100:{p:25,f:0.8,c:0,k:116,fib:0},sv:[{l:"1 tin (100 g)",g:100,d:1},{l:"½ tin",g:50}],step:20},
     {n:"Prawns (cooked)",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:24,f:0.3,c:0.2,k:99,fib:0},sv:[{l:"100 g",g:100,d:1},{l:"150 g",g:150}],step:25},
     {n:"Whole egg",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:12,f:10,c:1,k:144,fib:0},sv:[{l:"1 egg",g:50},{l:"2 eggs",g:100,d:1},{l:"3 eggs",g:150}],step:10},
     {n:"Egg white",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:12,f:0.2,c:0.6667,k:56.6667,fib:0},sv:[{l:"1 white",g:30},{l:"3 whites",g:90,d:1},{l:"6 whites",g:180}],step:10},
@@ -45,9 +45,9 @@
     {n:"Moong sprouts (boiled)",cat:"Protein & dairy",unit:"g",ver:"reference",hint:"no-cook: steam/soak",per100:{p:7.5,f:0.5,c:17,k:100,fib:2},sv:[{l:"100 g",g:100,d:1},{l:"150 g",g:150}],step:25},
     {n:"Greek yogurt / hung curd",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:10,f:2.7,c:4,k:87,fib:0},sv:[{l:"100 g",g:100},{l:"150 g",g:150,d:1},{l:"200 g",g:200}],step:25},
     {n:"Curd (regular)",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:5.3,f:3,c:4.8,k:60,fib:0},sv:[{l:"100 g",g:100},{l:"150 g",g:150,d:1}],step:25},
-    {n:"Buttermilk / chaas",cat:"Protein & dairy",unit:"ml",ver:"reference",hint:"no-cook",per100:{p:1,f:0.5,c:2.5,k:20,fib:0},sv:[{l:"1 glass",g:200,d:1}],step:50},
+    {n:"Buttermilk / chaas",cat:"Protein & dairy",unit:"ml",ver:"reference",hint:"no-cook",per100:{p:1,f:0.5,c:2.5,k:20,fib:0},sv:[{l:"1 glass (200 ml)",g:200,d:1}],step:50},
     {n:"Cheese slice",cat:"Protein & dairy",unit:"g",ver:"reference",per100:{p:17.5,f:22.5,c:5,k:300,fib:0},sv:[{l:"1 slice",g:20,d:1},{l:"2 slices",g:40}],step:5},
-    {n:"Milk – Nandini toned",cat:"Protein & dairy",unit:"ml",ver:"product-page",hint:"per 100 ml: 3.1 g protein",per100:{p:3.1,f:3,c:4.8,k:58,fib:0},sv:[{l:"100 ml",g:100},{l:"1 glass",g:200,d:1},{l:"250 ml",g:250}],step:50},
+    {n:"Milk – Nandini toned",cat:"Protein & dairy",unit:"ml",ver:"product-page",hint:"per 100 ml: 3.1 g protein",per100:{p:3.1,f:3,c:4.8,k:58,fib:0},sv:[{l:"100 ml",g:100},{l:"1 glass (200 ml)",g:200,d:1},{l:"250 ml",g:250}],step:50},
     // Grains & carbs
     {n:"Alpino High-Protein Oats (Choco)",cat:"Grains & carbs",unit:"g",ver:"product-page",hint:"27 g protein / 100 g",per100:{p:27,f:9.5,c:47,k:380,fib:9},sv:[{l:"40 g",g:40},{l:"50 g",g:50,d:1},{l:"60 g",g:60}],step:10},
     {n:"Rolled oats (plain)",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:13,f:7,c:66,k:380,fib:10},sv:[{l:"40 g",g:40},{l:"50 g",g:50,d:1},{l:"60 g",g:60}],step:10},
@@ -57,27 +57,40 @@
     {n:"Chapati / roti",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:7.5,f:7.5,c:50,k:300,fib:5},sv:[{l:"1 roti",g:40},{l:"2 rotis",g:80,d:1},{l:"3 rotis",g:120}],step:10},
     {n:"Idli",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"steam only",per100:{p:4,f:0.5,c:20,k:100,fib:1.5},sv:[{l:"2 idli",g:80},{l:"3 idli",g:120,d:1},{l:"4 idli",g:160}],step:10},
     {n:"Dosa (plain)",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:3.75,f:5,c:25,k:162.5,fib:1.5},sv:[{l:"1 dosa",g:80,d:1},{l:"2 dosas",g:160}],step:20},
-    {n:"Poha (cooked)",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"quick cook",per100:{p:2,f:3.3333,c:22.6667,k:133.3333,fib:1},sv:[{l:"½ katori",g:75},{l:"1 katori",g:150,d:1}],step:25},
+    {n:"Poha (cooked)",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"quick cook",per100:{p:2,f:3.3333,c:22.6667,k:133.3333,fib:1},sv:[{l:"½ katori (75 g)",g:75},{l:"1 katori (150 g)",g:150,d:1}],step:25},
     {n:"Brown bread",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:13.3333,f:3.3333,c:46.6667,k:266.6667,fib:5},sv:[{l:"1 slice",g:30},{l:"2 slices",g:60,d:1}],step:10},
     {n:"Roasted chana",cat:"Grains & carbs",unit:"g",ver:"reference",per100:{p:20,f:5.5,c:53,k:365,fib:15},sv:[{l:"30 g",g:30,d:1},{l:"50 g",g:50}],step:10},
-    {n:"Dal / rajma (cooked)",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"1 katori ≈ 150 g",per100:{p:4.6667,f:2,c:12,k:80,fib:3.3333},sv:[{l:"½ katori",g:75},{l:"1 katori",g:150,d:1},{l:"1.5 katori",g:225}],step:25},
+    {n:"Dal / rajma (cooked)",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"1 katori ≈ 150 g",per100:{p:4.6667,f:2,c:12,k:80,fib:3.3333},sv:[{l:"½ katori (75 g)",g:75},{l:"1 katori (150 g)",g:150,d:1},{l:"1.5 katori (225 g)",g:225}],step:25},
     // Vegetables
+    {n:"Carrot (raw)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:0.93,f:0.24,c:9.6,k:41,fib:2.8},sv:[{l:"1 medium (60 g)",g:60},{l:"100 g",g:100,d:1}],step:10},
+    {n:"Cucumber (raw)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:0.65,f:0.11,c:3.6,k:15,fib:0.5},sv:[{l:"100 g",g:100,d:1},{l:"\u00bd medium (150 g)",g:150}],step:25},
+    {n:"Bhurji veg (onion/tomato/capsicum)",cat:"Vegetables",unit:"g",ver:"reference",hint:"raw mix for bhurji",per100:{p:1.2,f:0.2,c:6.8,k:32,fib:1.7},sv:[{l:"1 katori (100 g)",g:100,d:1}],step:25},
     {n:"Spinach / palak (cooked)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:2.9,f:0.4,c:3.6,k:23,fib:2.4},sv:[{l:"100 g",g:100,d:1},{l:"150 g",g:150}],step:25},
     {n:"Broccoli (cooked)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:2.8,f:0.4,c:7,k:35,fib:3.3},sv:[{l:"100 g",g:100,d:1},{l:"150 g",g:150}],step:25},
-    {n:"Mixed veg sabzi (1 tsp oil)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:1.3333,f:2.6667,c:5.3333,k:50,fib:2},sv:[{l:"½ katori",g:75},{l:"1 katori",g:150,d:1},{l:"1.5 katori",g:225}],step:25},
-    {n:"Sambar",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:2.6667,f:1.6667,c:8,k:60,fib:2},sv:[{l:"½ katori",g:75},{l:"1 katori",g:150,d:1},{l:"1.5 katori",g:225}],step:25},
-    {n:"Kosambari (moong salad)",cat:"Vegetables",unit:"g",ver:"reference",hint:"no-cook",per100:{p:3.3333,f:1.3333,c:8,k:60,fib:2.6667},sv:[{l:"½ katori",g:75},{l:"1 katori",g:150,d:1}],step:25},
-    {n:"Green salad (dressed)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:0.6667,f:0.1333,c:2.6667,k:13.3333,fib:1},sv:[{l:"1 katori",g:150,d:1},{l:"2 katori",g:300}],step:25},
+    {n:"Mixed veg sabzi (1 tsp oil)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:1.3333,f:2.6667,c:5.3333,k:50,fib:2},sv:[{l:"½ katori (75 g)",g:75},{l:"1 katori (150 g)",g:150,d:1},{l:"1.5 katori (225 g)",g:225}],step:25},
+    {n:"Sambar",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:2.6667,f:1.6667,c:8,k:60,fib:2},sv:[{l:"½ katori (75 g)",g:75},{l:"1 katori (150 g)",g:150,d:1},{l:"1.5 katori (225 g)",g:225}],step:25},
+    {n:"Kosambari (moong salad)",cat:"Vegetables",unit:"g",ver:"reference",hint:"no-cook",per100:{p:3.3333,f:1.3333,c:8,k:60,fib:2.6667},sv:[{l:"½ katori (75 g)",g:75},{l:"1 katori (150 g)",g:150,d:1}],step:25},
+    {n:"Green salad (dressed)",cat:"Vegetables",unit:"g",ver:"reference",per100:{p:0.6667,f:0.1333,c:2.6667,k:13.3333,fib:1},sv:[{l:"1 katori (150 g)",g:150,d:1},{l:"2 katori (300 g)",g:300}],step:25},
     // Fruit
+    {n:"Watermelon (cubes)",cat:"Fruit",unit:"g",ver:"reference",per100:{p:0.61,f:0.15,c:7.55,k:30,fib:0.4},sv:[{l:"1 katori (150 g)",g:150,d:1},{l:"2 katori (300 g)",g:300}],step:25},
     {n:"Banana – Robusta/Cavendish",cat:"Fruit",unit:"g",ver:"reference",hint:"~120g edible, the common everyday banana",per100:{p:1.1,f:0.3,c:22.8,k:89,fib:2.6},sv:[{l:"1 banana",g:120,d:1},{l:"½ banana",g:60}],step:10},
     {n:"Banana – Nendran",cat:"Fruit",unit:"g",ver:"reference",hint:"~160g edible, larger Kerala/coastal variety",per100:{p:1.1,f:0.3,c:22.8,k:89,fib:2.6},sv:[{l:"1 banana",g:160,d:1},{l:"½ banana",g:80}],step:10},
     {n:"Banana – Yelakki (Elaichi)",cat:"Fruit",unit:"g",ver:"reference",hint:"~40g edible each, small — figures below are for 2",per100:{p:1.1,f:0.3,c:22.8,k:89,fib:2.6},sv:[{l:"1 small",g:40},{l:"2 small",g:80,d:1}],step:10},
     {n:"Apple",cat:"Fruit",unit:"g",ver:"reference",per100:{p:0.2778,f:0.1667,c:13.8889,k:52.7778,fib:2.4444},sv:[{l:"1 apple",g:180,d:1},{l:"½ apple",g:90}],step:10},
     {n:"Guava",cat:"Fruit",unit:"g",ver:"reference",per100:{p:2.6,f:1,c:14,k:68,fib:5.4},sv:[{l:"1 guava",g:100,d:1},{l:"2 guavas",g:200}],step:10},
-    {n:"Papaya (cubes)",cat:"Fruit",unit:"g",ver:"reference",per100:{p:0.5,f:0.2857,c:10.7143,k:42.8571,fib:1.7857},sv:[{l:"1 katori",g:140,d:1},{l:"2 katori",g:280}],step:20},
+    {n:"Papaya (cubes)",cat:"Fruit",unit:"g",ver:"reference",per100:{p:0.5,f:0.2857,c:10.7143,k:42.8571,fib:1.7857},sv:[{l:"1 katori (140 g)",g:140,d:1},{l:"2 katori (280 g)",g:280}],step:20},
     {n:"Orange",cat:"Fruit",unit:"g",ver:"reference",per100:{p:0.9231,f:0.1538,c:11.5385,k:47.6923,fib:2.3846},sv:[{l:"1 orange",g:130,d:1}],step:10},
     {n:"Dates",cat:"Fruit",unit:"g",ver:"reference",per100:{p:2.8571,f:0,c:75.7143,k:285.7143,fib:11.4286},sv:[{l:"2 dates",g:14,d:1},{l:"4 dates",g:28}],step:7},
-    {n:"Coconut water",cat:"Fruit",unit:"ml",ver:"reference",hint:"no-cook",per100:{p:0.7,f:0,c:4.5,k:19,fib:0},sv:[{l:"1 glass",g:200,d:1}],step:50},
+    {n:"Coconut water",cat:"Fruit",unit:"ml",ver:"reference",hint:"no-cook",per100:{p:0.7,f:0,c:4.5,k:19,fib:0},sv:[{l:"1 glass (200 ml)",g:200,d:1}],step:50},
+    {n:"Moong dal (dry)",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"dry \u2014 ~2 chilla per 50 g",per100:{p:24,f:1.2,c:59,k:347,fib:16.3},sv:[{l:"for 2 chilla (50 g)",g:50,d:1},{l:"25 g",g:25}],step:5},
+    {n:"Dalia / broken wheat (cooked)",cat:"Grains & carbs",unit:"g",ver:"reference",hint:"USDA bulgur, cooked",per100:{p:3.08,f:0.24,c:18.6,k:83,fib:4.5},sv:[{l:"1 katori (150 g)",g:150,d:1},{l:"1.5 katori (225 g)",g:225}],step:25},
+    {n:"Upma (no oil)",cat:"Grains & carbs",unit:"g",ver:"estimate",hint:"sooji + veg, no oil",per100:{p:3.8,f:0.4,c:22,k:110,fib:1.4},sv:[{l:"1 katori (150 g)",g:150,d:1}],step:25},
+    {n:"Ragi mudde / ragi rice (cooked)",cat:"Grains & carbs",unit:"g",ver:"estimate",hint:"IFCT dry values \u00f7 cooked hydration",per100:{p:2.1,f:0.4,c:19,k:91,fib:3.2},sv:[{l:"1 katori (150 g)",g:150,d:1},{l:"1.5 katori (225 g)",g:225}],step:25},
+    {n:"Jowar rice (cooked)",cat:"Grains & carbs",unit:"g",ver:"estimate",hint:"IFCT dry values \u00f7 cooked hydration",per100:{p:2.9,f:0.5,c:20,k:97,fib:2.7},sv:[{l:"1 katori (150 g)",g:150,d:1}],step:25},
+    {n:"Curd rice",cat:"Grains & carbs",unit:"g",ver:"estimate",hint:"~2:1 rice:curd",per100:{p:3.6,f:1.2,c:20,k:107,fib:0.3},sv:[{l:"1 katori (150 g)",g:150,d:1}],step:25},
+    {n:"Veg pulao",cat:"Grains & carbs",unit:"g",ver:"estimate",hint:"oil included",per100:{p:2.5,f:3.5,c:21,k:130,fib:1.3},sv:[{l:"1 katori (150 g)",g:150,d:1},{l:"1 plate (250 g)",g:250}],step:25},
+    {n:"Jeera / lemon rice",cat:"Grains & carbs",unit:"g",ver:"estimate",hint:"tempering oil included",per100:{p:2.5,f:4.5,c:24,k:150,fib:0.7},sv:[{l:"1 katori (150 g)",g:150,d:1}],step:25},
+    {n:"Chicken biryani",cat:"Grains & carbs",unit:"g",ver:"estimate",hint:"home-style; restaurant runs higher",per100:{p:7.5,f:5,c:16,k:140,fib:0.8},sv:[{l:"1 katori (150 g)",g:150,d:1},{l:"1 plate (250 g)",g:250}],step:25},
     // Nuts & fats
     {n:"Almonds",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:21,f:49,c:22,k:580,fib:12.5},sv:[{l:"10 g (~8 nuts)",g:10,d:1},{l:"20 g",g:20}],step:5},
     {n:"Walnuts",cat:"Nuts & fats",unit:"g",ver:"reference",per100:{p:15,f:65,c:14,k:654,fib:6.7},sv:[{l:"10 g",g:10,d:1},{l:"20 g",g:20}],step:5},
@@ -146,7 +159,7 @@
     return (f.sv||[]).find(s=>s.d)||(f.sv||[])[0]||{l:"100 "+f.unit,g:100};
   }
   function defAmt(f){return defServing(f).g;}
-  const VER_LABEL={label:"✓ label-verified","product-page":"from product page",reference:"reference values",custom:"your label"};
+  const VER_LABEL={label:"✓ label-verified","product-page":"from product page",reference:"reference values",estimate:"estimate",custom:"your label"};
   /* v1 custom foods stored macros per one <unit> ({per, def}). g/ml foods
      convert exactly to per100; count-based units (piece, serving…) keep a
      per-unit model — no gram weight exists to invent. Idempotent. */
@@ -389,7 +402,7 @@
         f.sv.forEach((s,i)=>{
           const b=document.createElement("button");b.type="button";
           b.className="svbtn"+(i===selSv?" on":"");
-          b.innerHTML='<span class="svl"></span><span class="svg">'+fmtAmt(s.g)+' '+f.unit+'</span>';
+          b.innerHTML='<span class="svl"></span>'+(s.l.indexOf("(")<0?'<span class="svg">'+fmtAmt(s.g)+' '+f.unit+'</span>':'');
           b.querySelector(".svl").textContent=s.l;
           b.onclick=()=>{selSv=i;renderQtyUI();updateSheetMacros();};
           presets.appendChild(b);
@@ -458,7 +471,8 @@
     let lbl=null;
     if(qtyMode==="sv"&&!sheetFood.countBased){
       const s=sheetFood.sv[selSv];
-      if(s&&!/^[\d.½]+ ?(g|ml)/.test(s.l)) lbl=s.l+" · "+fmtAmt(a)+" "+funit;
+      if(s&&!/^[\d.½]+ ?(g|ml)/.test(s.l))
+        lbl = /\(\d+(\.\d+)? ?(g|ml)\)/.test(s.l) ? s.l : s.l+" · "+fmtAmt(a)+" "+funit;
     }
     if(sheetMode==="meal"){
       if(!draft){closeSheet();return;}
@@ -1029,7 +1043,7 @@
     return t;
   }
   function planItemLabel(it){
-    if(!it.food) return it.name;
+    if(!it.food) return it.name+(it.note?" ("+it.note+")":"");
     const f=findFood(it.food);
     let s=fmtAmt(it.amt)+" "+(f?f.unit:"g")+" "+it.food;
     if(it.note)s+=" ("+it.note+")";
