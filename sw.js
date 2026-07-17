@@ -1,6 +1,6 @@
 /* Protein Tracker — service worker
    Bump CACHE version when you change app files, so the new version installs. */
-const CACHE = "protein-tracker-v14";
+const CACHE = "protein-tracker-v15";
 const ASSETS = [
   "./",
   "./index.html",
@@ -8,6 +8,7 @@ const ASSETS = [
   "./app.js",
   "./plan.js",
   "./recommend.js",
+  "./sync.js",
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
@@ -31,6 +32,10 @@ self.addEventListener("activate", e => {
 self.addEventListener("fetch", e => {
   const req = e.request;
   if (req.method !== "GET") return;
+
+  // Never cache the sync endpoint — cache-first would serve stale snapshots
+  // and swallow errors. Let /api/* hit the network directly.
+  if (new URL(req.url).pathname.startsWith("/api/")) return;
 
   // Navigations: network-first so updates land, fall back to cached shell offline.
   if (req.mode === "navigate") {

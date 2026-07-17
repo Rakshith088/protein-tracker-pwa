@@ -130,12 +130,12 @@
   function lsGet(k,fb){ try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb;}catch(e){return fb;} }
   function lsSet(k,v){ try{localStorage.setItem(k,JSON.stringify(v));}catch(e){toast("Storage full or blocked");} }
   function loadDay(k){return lsGet("pt:log:"+k,[]);}
-  function saveDay(){lsSet("pt:log:"+dateKey,entries);}
-  function saveCustom(){lsSet("pt:customfoods",customFoods);}
-  function saveTargets(){lsSet("pt:targets",targets);}
-  function saveWeights(){lsSet("pt:weights",weights);}
-  function saveWaist(){lsSet("pt:waist",waist);}
-  function saveTaps(){lsSet("pt:taps",taps);}
+  function saveDay(){lsSet("pt:log:"+dateKey,entries);markDirty();}
+  function saveCustom(){lsSet("pt:customfoods",customFoods);markDirty();}
+  function saveTargets(){lsSet("pt:targets",targets);markDirty();}
+  function saveWeights(){lsSet("pt:weights",weights);markDirty();}
+  function saveWaist(){lsSet("pt:waist",waist);markDirty();}
+  function saveTaps(){lsSet("pt:taps",taps);markDirty();}
   function allLogKeys(){
     const out=[];
     for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith("pt:log:"))out.push(k);}
@@ -716,7 +716,7 @@
   /* ---------- settings + coach check-in ---------- */
   /* pt:targetlog: [{d: ISO, targets:{p,k,f,c,fib}}] — appended on every coach
      update and carried in the export, so the coach sees when changes took effect */
-  function saveTargetlog(){lsSet("pt:targetlog",targetlog);}
+  function saveTargetlog(){lsSet("pt:targetlog",targetlog);markDirty();}
   function deltaChipsHtml(oldT,newT){
     const KEYS=[["k","kcal"],["p","P"],["f","F"],["c","C"],["fib","Fib"]];
     return KEYS.map(([key,lbl])=>{
@@ -844,6 +844,18 @@
     download("protein-tracker-"+dateKey+".csv",rows.map(r=>r.map(esc).join(",")).join("\n"),"text/csv");
     toast("CSV downloaded");
   };
+  /* writes a full payload into localStorage — shared by import and sync */
+  function applyBackup(d){
+    allLogKeys().forEach(k=>localStorage.removeItem(k));
+    Object.entries(d.logs).forEach(([day,list])=>lsSet("pt:log:"+day,list));
+    if(d.targets)lsSet("pt:targets",d.targets);
+    if(d.customFoods)lsSet("pt:customfoods",d.customFoods);
+    if(d.meals)lsSet("pt:meals",d.meals);
+    if(d.weights)lsSet("pt:weights",d.weights);
+    if(d.waist)lsSet("pt:waist",d.waist);   // absent in schema-3 backups — fine
+    if(d.targetlog)lsSet("pt:targetlog",d.targetlog);
+    if(d.taps)lsSet("pt:taps",d.taps);
+  }
   $("impBtn").onclick=()=>$("impFile").click();
   $("impFile").onchange=function(){
     const file=this.files&&this.files[0]; if(!file)return;
@@ -856,15 +868,8 @@
         if(!confirm("Import backup from "+(d.exported||"unknown date")+"?\n\n"+dayCount+" days, "+
            (d.customFoods||[]).length+" custom foods, "+(d.meals||[]).length+" meals, "+
            (d.weights||[]).length+" weigh-ins.\n\nThis replaces everything currently in the app.")) return;
-        allLogKeys().forEach(k=>localStorage.removeItem(k));
-        Object.entries(d.logs).forEach(([day,list])=>lsSet("pt:log:"+day,list));
-        if(d.targets)lsSet("pt:targets",d.targets);
-        if(d.customFoods)lsSet("pt:customfoods",d.customFoods);
-        if(d.meals)lsSet("pt:meals",d.meals);
-        if(d.weights)lsSet("pt:weights",d.weights);
-        if(d.waist)lsSet("pt:waist",d.waist);   // absent in schema-3 backups — fine
-        if(d.targetlog)lsSet("pt:targetlog",d.targetlog);
-        if(d.taps)lsSet("pt:taps",d.taps);
+        applyBackup(d);
+        lsSet("pt:lastchange",new Date().toISOString());   // imported state is "our" newest state
         toast("Backup restored");
         setTimeout(()=>location.reload(),700);
       }catch(err){ toast("That file isn't a valid backup"); }
@@ -907,6 +912,114 @@
       }).catch(()=>{});
     }
   }
+
+  /* ---------- sync runtime (merge logic lives in sync.js; contract in docs/SYNC.md)
+     localStorage stays authoritative on-device; sync is a background copy.
+     pt:sync       {token, lastPush, lastPull}
+     pt:lastchange ISO of the last local DATA change — this (not "now") is the
+     snapshot's `exported`, so an empty new device never outranks real data. */
+  const SYNC_URL="/api/sync", SYNC_DEBOUNCE_MS=4000;
+  let syncCfg=lsGet("pt:sync",null), syncTimer=null, syncBusy=false;
+  function syncEnabled(){return !!(syncCfg&&syncCfg.token);}
+  function saveSyncCfg(){lsSet("pt:sync",syncCfg);}
+  function markDirty(){
+    try{localStorage.setItem("pt:lastchange",JSON.stringify(new Date().toISOString()));}catch(e){}
+    if(syncEnabled()){clearTimeout(syncTimer);syncTimer=setTimeout(pushSync,SYNC_DEBOUNCE_MS);}
+  }
+  function collectForSync(){
+    const d=collectAll();
+    d.exported=lsGet("pt:lastchange","1970-01-01T00:00:00.000Z");
+    return d;
+  }
+  async function syncFetch(method,body){
+    const r=await fetch(SYNC_URL,{method:method,
+      headers:Object.assign({Authorization:"Bearer "+syncCfg.token},body?{"Content-Type":"application/json"}:{}),
+      body:body?JSON.stringify(body):undefined});
+    let data=null; try{data=await r.json();}catch(e){}
+    return {status:r.status,data:data};
+  }
+  async function pushSync(isRetry){
+    if(!syncEnabled()||syncBusy)return; syncBusy=true;
+    try{
+      const r=await syncFetch("PUT",collectForSync());
+      if(r.status===200){syncCfg.lastPush=new Date().toISOString();saveSyncCfg();refreshSyncUI();}
+      else if(r.status===409&&!isRetry){syncBusy=false;return pullSync(true);}
+      else if(r.status===401){toast("Sync token rejected — check Settings");}
+    }catch(e){/* offline — the 'online' listener and next launch retry */}
+    syncBusy=false;
+  }
+  async function pullSync(pushAfter){
+    if(!syncEnabled()||syncBusy)return; syncBusy=true;
+    try{
+      const r=await syncFetch("GET");
+      if(r.status===404){syncBusy=false;return pushSync();}          // first device on this token
+      if(r.status===401){toast("Sync token rejected — check Settings");syncBusy=false;return;}
+      if(r.status===200&&r.data&&window.SYNC){
+        const res=window.SYNC.merge(collectForSync(),r.data);
+        syncCfg.lastPull=new Date().toISOString();saveSyncCfg();
+        if(res.changedLocal){
+          applyBackup(res.merged);
+          lsSet("pt:lastchange",res.merged.exported);   // local state == merged, no false "newer"
+          toast("Synced from your other device");
+          setTimeout(()=>location.reload(),600);
+          return;                                        // reload re-runs pull: converges, no loop
+        }
+        if(res.changedRemote||pushAfter){syncBusy=false;return pushSync(true);}
+        refreshSyncUI();
+      }
+    }catch(e){/* offline */}
+    syncBusy=false;
+  }
+  function refreshSyncUI(){
+    const line=$("syncLine"); if(!line)return;
+    const on=syncEnabled();
+    const offRow=$("syncOffRow"),onRow=$("syncOnRow"),entry=$("syncTokenEntry"),box=$("syncTokenBox");
+    if(offRow)offRow.style.display=on?"none":"flex";
+    if(onRow)onRow.style.display=on?"flex":"none";
+    if(!on){line.textContent="Off — data lives only on this device.";if(box){box.style.display="none";box.innerHTML="";}if(entry)entry.style.display="none";return;}
+    const last=syncCfg.lastPush||syncCfg.lastPull;
+    line.textContent="On — "+(last?("last synced "+(daysBetween(last)===0?"today":daysBetween(last)+" day"+(daysBetween(last)===1?"":"s")+" ago")):"not synced yet")+".";
+  }
+  function showSyncToken(){
+    const box=$("syncTokenBox"); if(!box||!syncEnabled())return;
+    box.style.display="flex";
+    box.innerHTML='<span class="tok"></span><span>tap the token to copy it, then paste it into Settings → Sync on your other device</span>';
+    const tok=box.querySelector(".tok");
+    tok.textContent=syncCfg.token;
+    tok.onclick=()=>{
+      if(navigator.clipboard&&navigator.clipboard.writeText)
+        navigator.clipboard.writeText(syncCfg.token).then(()=>toast("Token copied"),()=>{});
+    };
+  }
+  bind("syncEnable","click",()=>{
+    if(!window.SYNC||!(window.crypto&&crypto.getRandomValues)){toast("Sync unavailable in this browser");return;}
+    syncCfg={token:window.SYNC.makeToken(b=>crypto.getRandomValues(b))};
+    saveSyncCfg();refreshSyncUI();showSyncToken();
+    pushSync();
+    toast("Sync on — this device seeded the data");
+  });
+  bind("syncUse","click",()=>{
+    const entry=$("syncTokenEntry"); if(entry){entry.style.display="flex";const i=$("syncTokenIn");if(i)i.focus();}
+  });
+  bind("syncConnect","click",()=>{
+    const i=$("syncTokenIn"); const tok=(i&&i.value||"").trim();
+    if(!window.SYNC||!window.SYNC.TOKEN_RE.test(tok)){toast("That doesn't look like a sync token");return;}
+    syncCfg={token:tok};saveSyncCfg();
+    /* the token's existing data is authoritative for targets etc.; local
+       logs still survive via the union merge */
+    lsSet("pt:lastchange","1970-01-01T00:00:00.000Z");
+    refreshSyncUI();
+    pullSync();
+    toast("Connecting…");
+  });
+  bind("syncNow","click",()=>{pullSync(true);toast("Syncing…");});
+  bind("syncShow","click",showSyncToken);
+  bind("syncOff","click",()=>{
+    if(!confirm("Turn off sync on this device? Your data stays here; the copy on the server stays for your other device."))return;
+    syncCfg=null;try{localStorage.removeItem("pt:sync");}catch(e){}
+    refreshSyncUI();toast("Sync off");
+  });
+  window.addEventListener("online",()=>{if(syncEnabled())pushSync();});
 
   /* ---------- days-since-export nudge (dismiss = snooze, it comes back) ---------- */
   const NUDGE_AFTER_DAYS=7, NUDGE_SNOOZE_DAYS=3, NUDGE_MIN_LOGGED_DAYS=3;
@@ -975,7 +1088,7 @@
   /* ================= MY MEALS ================= */
   let meals=[], draft=null, editingId=null;
   function loadMeals(){meals=lsGet("pt:meals",[]);}
-  function saveMeals(){lsSet("pt:meals",meals);}
+  function saveMeals(){lsSet("pt:meals",meals);markDirty();}
   function mealTotals(m){return sumOf(m.items||[]);}
   function ingLine(m){return (m.items||[]).map(i=>i.n+" "+(i.lbl||fmtAmt(i.amt)+i.unit)).join(" · ");}
 
@@ -1268,6 +1381,7 @@
     const dEl=$("date"); if(dEl) dEl.textContent=prettyDate();
     renderChips("");renderFavs();render();renderWeight();renderWaist();renderWeek();renderNudge();
     initDurability();
+    if(syncEnabled()) pullSync();   // launch pull: adopt-and-reload if the server has news
   }catch(e){
     warn("init failed: "+e.message);
     const fl=$("foodlist");
